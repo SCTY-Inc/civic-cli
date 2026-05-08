@@ -1,7 +1,3 @@
-"""Tool implementations for policy research."""
-
-from __future__ import annotations
-
 import os
 
 import httpx
@@ -88,11 +84,10 @@ def _stringify(value: object, default: str = "") -> str:
 
 
 class WebSearch(BaseTool):
-    """Exa-powered web search."""
-
     SOURCE_TYPE = "WEB"
 
     def __init__(self):
+        super().__init__()
         self._client: Exa | None = None
 
     @property
@@ -119,30 +114,25 @@ class WebSearch(BaseTool):
         except ValueError as error:
             return self._error(f"Exa API error: {error}")
 
-        try:
-            findings = []
-            for result in results.results[:_base.RESULTS_LIMIT]:
-                snippet = getattr(result, "summary", "") or _as_string(
-                    getattr(result, "text", "")
-                )[:1000]
-                date = _as_string(getattr(result, "published_date", ""))[:10]
-                findings.append(
-                    Finding(
-                        title=getattr(result, "title", "") or "Untitled",
-                        snippet=snippet,
-                        url=getattr(result, "url", ""),
-                        date=date,
-                        source_type=self.SOURCE_TYPE,
-                    )
+        findings = []
+        for result in results.results[:_base.RESULTS_LIMIT]:
+            snippet = getattr(result, "summary", "") or _as_string(
+                getattr(result, "text", "")
+            )[:1000]
+            date = _as_string(getattr(result, "published_date", ""))[:10]
+            findings.append(
+                Finding(
+                    title=getattr(result, "title", "") or "Untitled",
+                    snippet=snippet,
+                    url=getattr(result, "url", ""),
+                    date=date,
+                    source_type=self.SOURCE_TYPE,
                 )
-            return self._ok(findings)
-        except (AttributeError, TypeError) as error:
-            return self._parse_error("Exa web", error)
+            )
+        return self._ok(findings)
 
 
 class AcademicSearch(BaseTool):
-    """Semantic Scholar academic paper search."""
-
     SOURCE_TYPE = "ACADEMIC"
     BASE_URL = "https://api.semanticscholar.org/graph/v1"
 
@@ -190,8 +180,6 @@ class AcademicSearch(BaseTool):
 
 
 class CongressSearch(BaseTool):
-    """Congress.gov legislation search."""
-
     SOURCE_TYPE = "CONGRESS"
     BASE_URL = "https://api.congress.gov/v3"
 
@@ -233,8 +221,6 @@ class CongressSearch(BaseTool):
 
 
 class FederalRegisterSearch(BaseTool):
-    """Federal Register rules and notices search."""
-
     SOURCE_TYPE = "FED_REGISTER"
     BASE_URL = "https://www.federalregister.gov/api/v1"
 
@@ -280,8 +266,6 @@ class FederalRegisterSearch(BaseTool):
 
 
 class RegulationsSearch(BaseTool):
-    """Regulations.gov dockets, comments, and rulemaking documents."""
-
     SOURCE_TYPE = "REGULATIONS"
     BASE_URL = "https://api.regulations.gov/v4"
 
@@ -329,7 +313,6 @@ class RegulationsSearch(BaseTool):
 
 
 class CourtSearch(BaseTool):
-    """CourtListener federal case law search."""
 
     SOURCE_TYPE = "COURT"
     BASE_URL = "https://www.courtlistener.com/api/rest/v4"
@@ -373,8 +356,6 @@ class CourtSearch(BaseTool):
 
 
 class CensusSearch(BaseTool):
-    """US Census Bureau data search."""
-
     SOURCE_TYPE = "CENSUS"
     BASE_URL = "https://api.census.gov/data"
 
@@ -389,7 +370,6 @@ class CensusSearch(BaseTool):
         "homeownership": "B25003_002E",
         "vacancy": "B25002_003E",
         "education": "B15003_022E",
-        "bachelors": "B15003_022E",
         "high_school": "B15003_017E",
         "unemployment": "B23025_005E",
         "labor_force": "B23025_002E",
@@ -480,13 +460,12 @@ class CensusSearch(BaseTool):
 
 
 class StateLegislationSearch(BaseTool):
-    """OpenStates state legislation search with situational LegiScan fallback."""
-
     SOURCE_TYPE = "STATE_LEG"
     BASE_URL = "https://v3.openstates.org"
     LEGISCAN_URL = "https://api.legiscan.com/"
 
     def __init__(self, default_states: list[str] | None = None):
+        super().__init__()
         self.default_states = default_states or []
 
     def execute(self, query: str = "", state: str | None = None, **kwargs) -> ToolResult:

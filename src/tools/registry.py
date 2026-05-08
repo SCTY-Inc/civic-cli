@@ -1,5 +1,3 @@
-"""Tool registry for executing tools by name."""
-
 from collections.abc import Mapping
 
 from scopes import Scope
@@ -19,7 +17,6 @@ from .implementations import (
 
 
 class ToolRegistry:
-    """Registry for executing tools by name."""
 
     def __init__(self, scope: Scope):
         self.scope = scope
@@ -40,7 +37,7 @@ class ToolRegistry:
         }
 
     def execute(self, tool_name: str, args: Mapping[str, object]) -> tuple[list[Finding], str]:
-        """Execute tool, return (findings, formatted_text)."""
+        """Return (findings, formatted_str) where formatted_str is the markdown text for Gemini."""
         tool = self._tools.get(tool_name)
         if not tool:
             return [], f"Unknown tool: {tool_name}"

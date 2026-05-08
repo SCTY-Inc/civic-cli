@@ -1,7 +1,3 @@
-"""Base tool class and common utilities."""
-
-from __future__ import annotations
-
 import hashlib
 import json
 import sqlite3
@@ -15,8 +11,7 @@ import httpx
 
 from .models import Finding, ToolResult
 
-JsonPrimitive = None | bool | int | float | str
-JsonValue = JsonPrimitive | list["JsonValue"] | dict[str, "JsonValue"]
+JsonValue = None | bool | int | float | str | list["JsonValue"] | dict[str, "JsonValue"]
 
 RESULTS_LIMIT = 25  # module-level default; override via set_results_limit()
 TIMEOUT = 30
@@ -27,14 +22,13 @@ _DB_PATH = CACHE_DIR / "cache.db"
 
 
 def set_results_limit(n: int) -> None:
-    """Override the per-tool results limit (default 25)."""
     global RESULTS_LIMIT
     if n is not None and n > 0:
         RESULTS_LIMIT = int(n)
 
 
 def _get_cache_db() -> sqlite3.Connection:
-    """Get or create cache database with WAL mode."""
+    """Open cache DB with WAL mode; creates file and table on first call."""
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     db = sqlite3.connect(str(_DB_PATH))
     db.execute("PRAGMA journal_mode=WAL")
@@ -45,13 +39,11 @@ def _get_cache_db() -> sqlite3.Connection:
 
 
 def _cache_key(url: str, params: Mapping[str, object] | None) -> str:
-    """Generate cache key from request parameters."""
     raw = json.dumps({"url": url, "params": dict(params or {})}, sort_keys=True)
     return hashlib.sha256(raw.encode()).hexdigest()
 
 
 def _read_cached_json(key: str) -> JsonValue | None:
-    """Return a cached JSON value when present and fresh."""
     try:
         with closing(_get_cache_db()) as db:
             row = db.execute(
@@ -67,7 +59,7 @@ def _read_cached_json(key: str) -> JsonValue | None:
 
 
 def _write_cached_json(key: str, value: JsonValue) -> None:
-    """Best-effort cache write; cache failures should not fail the request."""
+    """Best-effort write; sqlite errors must not propagate to callers."""
     try:
         with closing(_get_cache_db()) as db:
             db.execute(
@@ -79,8 +71,7 @@ def _write_cached_json(key: str, value: JsonValue) -> None:
         return
 
 
-def get_cache_stats() -> dict | None:
-    """Return cache stats or None if no cache exists."""
+def get_cache_stats() -> dict[str, object] | None:
     if not _DB_PATH.exists():
         return None
     with closing(_get_cache_db()) as db:
@@ -96,7 +87,6 @@ def get_cache_stats() -> dict | None:
 
 
 def clear_cache() -> bool:
-    """Delete cache database. Returns True if cache existed."""
     if _DB_PATH.exists():
         _DB_PATH.unlink()
         return True
@@ -104,28 +94,30 @@ def clear_cache() -> bool:
 
 
 class BaseTool(ABC):
-    """Base class for all research tools."""
 
     SOURCE_TYPE: str = "UNKNOWN"
 
+    def __init__(self):
+        self._http_client: httpx.Client | None = None
+
+    def __del__(self):
+        if self._http_client is not None:
+            self._http_client.close()
+
     @abstractmethod
-    def execute(self, **kwargs) -> ToolResult:
-        """Execute the tool and return findings plus any provider errors."""
+    def execute(self, **kwargs) -> ToolResult: ...
 
     def _ok(self, findings: list[Finding]) -> ToolResult:
-        """Return a successful tool result."""
         return ToolResult(findings=findings)
 
     def _error(self, message: str) -> ToolResult:
-        """Return a tool error without fabricating fake findings."""
+        """Never fabricates findings; all errors are explicit."""
         return ToolResult(errors=[message])
 
     def _missing_api_key(self, name: str) -> ToolResult:
-        """Return a consistent missing-key error."""
         return self._error(f"{name} not set")
 
     def _http_error(self, service: str, error: httpx.HTTPError) -> ToolResult:
-        """Return a concise provider-boundary error message."""
         if isinstance(error, httpx.HTTPStatusError):
             return self._error(
                 f"{service} API error ({error.response.status_code}): {error.response.reason_phrase}"
@@ -133,7 +125,6 @@ class BaseTool(ABC):
         return self._error(f"{service} API error: {error}")
 
     def _parse_error(self, service: str, error: Exception) -> ToolResult:
-        """Return a concise parsing/shape error message."""
         return self._error(f"Failed to parse {service} results: {error}")
 
     def _fetch_json(
@@ -142,31 +133,32 @@ class BaseTool(ABC):
         params: Mapping[str, object] | None = None,
         headers: Mapping[str, str] | None = None,
     ) -> JsonValue:
-        """Fetch JSON with retry, backoff, and caching."""
         key = _cache_key(url, params)
         cached = _read_cached_json(key)
         if cached is not None:
             return cached
 
+        if self._http_client is None:
+            self._http_client = httpx.Client(timeout=TIMEOUT)
+
         last_error: httpx.HTTPError | None = None
-        with httpx.Client(timeout=TIMEOUT) as client:
-            for attempt in range(MAX_RETRIES):
-                try:
-                    response = client.get(url, params=params, headers=headers)
-                    response.raise_for_status()
-                    data = response.json()
-                    _write_cached_json(key, data)
-                    return data
-                except httpx.HTTPStatusError as error:
-                    if error.response.status_code in (429, 500, 502, 503, 504):
-                        last_error = error
-                        if attempt < MAX_RETRIES - 1:
-                            time.sleep(2**attempt)
-                        continue
-                    raise
-                except (httpx.TimeoutException, httpx.ConnectError) as error:
+        for attempt in range(MAX_RETRIES):
+            try:
+                response = self._http_client.get(url, params=params, headers=headers)
+                response.raise_for_status()
+                data = response.json()
+                _write_cached_json(key, data)
+                return data
+            except httpx.HTTPStatusError as error:
+                if error.response.status_code in (429, 500, 502, 503, 504):
                     last_error = error
                     if attempt < MAX_RETRIES - 1:
                         time.sleep(2**attempt)
+                    continue
+                raise
+            except (httpx.TimeoutException, httpx.ConnectError) as error:
+                last_error = error
+                if attempt < MAX_RETRIES - 1:
+                    time.sleep(2**attempt)
 
         raise last_error or httpx.ConnectError("Max retries exceeded")

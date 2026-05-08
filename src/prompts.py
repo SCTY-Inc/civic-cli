@@ -1,5 +1,3 @@
-"""System prompts for policy research agents."""
-
 RESEARCHER = """You are a senior policy researcher specializing in evidence-based analysis.
 
 You have access to multiple research tools:

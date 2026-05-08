@@ -1,5 +1,3 @@
-"""Shared scope parsing and labeling helpers."""
-
 from __future__ import annotations
 
 from typing import Literal, TypedDict
@@ -23,7 +21,6 @@ DEFAULT_SCOPE: Scope = {"type": "all", "states": []}
 
 
 def parse_scope(scope_str: str) -> Scope:
-    """Parse a CLI scope string into a normalized scope dict."""
     if scope_str in {"federal", "all", "news", "policy"}:
         return {"type": scope_str, "states": []}
     if scope_str.startswith("state:"):
@@ -38,7 +35,6 @@ def parse_scope(scope_str: str) -> Scope:
 
 
 def parse_compare(compare_str: str) -> list[str]:
-    """Parse compare targets from CLI input."""
     targets = [target.strip() for target in compare_str.split(",")]
     for target in targets:
         if target not in VALID_COMPARE_TARGETS and target.upper() not in VALID_STATES:
@@ -47,14 +43,13 @@ def parse_compare(compare_str: str) -> list[str]:
 
 
 def compare_target_scope(target: str) -> Scope:
-    """Convert a compare target into a normalized scope."""
     if target in VALID_COMPARE_TARGETS:
         return {"type": target, "states": []}
     return {"type": "state", "states": [target.upper()]}
 
 
 def scope_label(scope: Scope) -> str:
-    """Return the human-readable label used in JSON and markdown output."""
+    """Canonical string used in JSON output and markdown headers (e.g. 'state:CA', 'federal + state')."""
     if scope["type"] == "state":
         return f"state:{','.join(scope['states'])}"
     if scope["type"] == "all":

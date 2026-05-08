@@ -1,10 +1,11 @@
-"""CLI entry point for civic policy research."""
-
 import argparse
+import functools
 import json
 import os
 import signal
 import sys
+import types as _stdlib_types
+from collections.abc import Callable
 from contextlib import nullcontext
 from datetime import datetime
 from pathlib import Path
@@ -20,7 +21,7 @@ from agents import compare_research, research, review, write_brief, write_compar
 from output import format_json, save_report
 from output_signals import emit_signals
 from scopes import Scope, compare_target_scope, parse_compare, parse_scope, scope_label
-from tools import ResearchResults, get_tool_names
+from tools import ResearchOutput, ResearchResults, get_tool_names
 from tools.base import clear_cache, get_cache_stats, set_results_limit
 from tools.declarations import HARD_REQUIRED_TOOL_ENV_VARS
 
@@ -38,6 +39,7 @@ API_KEY_SIGNUP = {
     "EXA_API_KEY": "https://dashboard.exa.ai/api-keys",
     "CONGRESS_GOV_API_KEY": "https://api.congress.gov/sign-up",
     "OPENSTATES_API_KEY": "https://openstates.org/accounts/register/",
+    "LEGISCAN_API_KEY": "https://legiscan.com/legiscan",
     "REGULATIONS_GOV_API_KEY": "https://open.gsa.gov/api/regulationsgov/",
     "CENSUS_API_KEY": "https://api.census.gov/data/key_signup.html",
 }
@@ -53,10 +55,8 @@ class TopicConfig(TypedDict, total=False):
     output: str
 
 
-# --- Topics ---
-
 def find_topics_file() -> Path | None:
-    """Locate topics.toml from cwd, parent dirs, or an installed package."""
+    """Search cwd, all parent dirs, and the package directory for topics.toml."""
     candidates: list[Path] = []
     cwd = Path.cwd()
     candidates.extend(parent / TOPICS_FILENAME for parent in (cwd, *cwd.parents))
@@ -74,8 +74,8 @@ def find_topics_file() -> Path | None:
     return None
 
 
+@functools.lru_cache(maxsize=1)
 def load_topics() -> dict[str, TopicConfig]:
-    """Load named topic presets from topics.toml."""
     topics_file = find_topics_file()
     if not topics_file:
         return {}
@@ -85,11 +85,7 @@ def load_topics() -> dict[str, TopicConfig]:
 
 
 def get_topic(name: str) -> TopicConfig | None:
-    """Get a single topic preset by name."""
     return load_topics().get(name)
-
-
-# --- Scope / compare parsing ---
 
 
 def _requested_tool_names(scope: Scope, compare: list[str] | None = None) -> list[str]:
@@ -145,10 +141,34 @@ def _print_sources(results: ResearchResults) -> None:
     console.print()
 
 
-# --- Pipeline runner ---
+def _merge_compare_results(
+    outputs: list[ResearchOutput],
+    compare_str: str | None,
+) -> tuple[ResearchResults, str]:
+    results = ResearchResults()
+    for output in outputs:
+        results.findings.extend(output.results.findings)
+        for tool, count in output.results.tool_usage.items():
+            results.tool_usage[tool] = results.tool_usage.get(tool, 0) + count
+    label = f"compare:{compare_str}"
+    return results, label
+
+
+def _run_guarded(fn: Callable[[], int], verbose: bool) -> int:
+    """Uniform error surface for pipeline commands: KeyboardInterrupt → 130, Exception → 1."""
+    try:
+        return fn()
+    except KeyboardInterrupt:
+        err_console.print("\n[yellow]Interrupted[/]")
+        return 130
+    except Exception as e:
+        err_console.print(f"[red]Error:[/] {e}")
+        if verbose:
+            err_console.print_exception()
+        return 1
+
 
 def _status(message: str, *, enabled: bool):
-    """Return a spinner context when interactive output is enabled."""
     return console.status(message) if enabled else nullcontext()
 
 
@@ -168,7 +188,6 @@ def run_pipeline(
     if limit:
         set_results_limit(limit)
 
-    # Read topic from stdin when '-' is passed
     if topic == "-":
         topic = sys.stdin.read().strip()
         if not topic:
@@ -189,7 +208,7 @@ def run_pipeline(
 
     is_json = output_format == "json"
 
-    try:
+    def _body() -> int:
         if compare_targets:
             if not is_json:
                 console.print(f"[bold]Civic[/] comparing: {topic}")
@@ -255,25 +274,18 @@ def run_pipeline(
         console.print(f"\n[green]Saved:[/] {out}")
         return 0
 
-    except KeyboardInterrupt:
-        err_console.print("\n[yellow]Interrupted[/]")
-        return 130
-    except Exception as e:
-        err_console.print(f"[red]Error:[/] {e}")
-        if verbose:
-            err_console.print_exception()
-        return 1
+    return _run_guarded(_body, verbose)
 
 
-# --- CLI ---
-
-def handle_interrupt(_signum, _frame):
+def handle_interrupt(
+    _signum: int,
+    _frame: _stdlib_types.FrameType | None,
+) -> None:
     err_console.print("\n[yellow]Interrupted[/]")
     sys.exit(130)
 
 
-def cmd_run(args) -> int:
-    """Run a named topic preset from topics.toml."""
+def cmd_run(args: argparse.Namespace) -> int:
     topic_config = _load_topic_or_error(args.name, label="Topic")
     if not topic_config:
         return 1
@@ -294,8 +306,7 @@ def cmd_run(args) -> int:
     )
 
 
-def cmd_cache(args) -> int:
-    """Manage response cache."""
+def cmd_cache(args: argparse.Namespace) -> int:
     if args.cache_action == "clear":
         if clear_cache():
             console.print("[green]Cache cleared[/]")
@@ -319,8 +330,7 @@ def cmd_cache(args) -> int:
     return 0
 
 
-def cmd_topics(args) -> int:
-    """List available topic presets."""
+def cmd_topics(args: argparse.Namespace) -> int:
     topics = load_topics()
     if not topics:
         console.print(f"[dim]No topics found. Create {Path.cwd() / TOPICS_FILENAME}[/]")
@@ -334,8 +344,7 @@ def cmd_topics(args) -> int:
     return 0
 
 
-def cmd_research(args) -> int:
-    """Run ad-hoc research on a topic."""
+def cmd_research(args: argparse.Namespace) -> int:
     return run_pipeline(
         topic=args.topic,
         scope_str=args.scope,
@@ -350,12 +359,8 @@ def cmd_research(args) -> int:
     )
 
 
-def cmd_signals(args) -> int:
-    """Emit atomic per-finding signals as JSON (for web-pulse and similar consumers).
-
-    Reuses the research tool-loop but skips the markdown synthesis phase.
-    Either provide a preset name (positional) or --topic for ad-hoc.
-    """
+def cmd_signals(args: argparse.Namespace) -> int:
+    """Skips Gemini write/review; emits raw findings as atomic JSON for downstream consumers."""
     if args.preset:
         topic_config = _load_topic_or_error(args.preset, label="Preset")
         if not topic_config:
@@ -390,15 +395,10 @@ def cmd_signals(args) -> int:
     if args.limit:
         set_results_limit(args.limit)
 
-    try:
+    def _body() -> int:
         if compare_targets:
             outputs = compare_research(topic, compare_targets, questions, verbose=args.verbose)
-            results = ResearchResults()
-            for output in outputs:
-                results.findings.extend(output.results.findings)
-                for tool, count in output.results.tool_usage.items():
-                    results.tool_usage[tool] = results.tool_usage.get(tool, 0) + count
-            label = f"compare:{compare_str}"
+            results, label = _merge_compare_results(outputs, compare_str)
         else:
             research_output = research(topic, questions, scope=scope, verbose=args.verbose)
             label = research_output.scope_label
@@ -407,20 +407,11 @@ def cmd_signals(args) -> int:
         print(emit_signals(topic, preset_name, label, results))
         return 0
 
-    except KeyboardInterrupt:
-        err_console.print("\n[yellow]Interrupted[/]")
-        return 130
-    except Exception as e:
-        err_console.print(f"[red]Error:[/] {e}")
-        if args.verbose:
-            err_console.print_exception()
-        return 1
+    return _run_guarded(_body, args.verbose)
 
 
-def cmd_doctor(args) -> int:
+def cmd_doctor(args: argparse.Namespace) -> int:
     """Validate env vars. Required keys fail the run; optional keys warn only."""
-    # Required vs optional split mirrors tools/implementations.py:
-    # GOOGLE_API_KEY + EXA_API_KEY always required; the rest gate specific sources.
     required_keys = ["GOOGLE_API_KEY", "EXA_API_KEY"]
     optional_keys = [
         "CONGRESS_GOV_API_KEY",
@@ -433,11 +424,11 @@ def cmd_doctor(args) -> int:
     def _env_check(name: str) -> bool:
         return bool(os.getenv(name))
 
-    # Shared column width so optional (manual) and required (doctor_runner)
-    # rows line up identically — matches the `[PASS]/[FAIL]` alignment.
+    # Shared column width keeps optional (printed manually) and required (via doctor_runner)
+    # rows visually aligned in the [PASS]/[FAIL]/[WARN] output.
     width = max(len(f"env {k}") for k in required_keys + optional_keys)
 
-    # Advisory scan of optional keys (never fails the run).
+    # Advisory scan of optional keys — never exits nonzero.
     for k in optional_keys:
         ok = _env_check(k)
         mark = "PASS" if ok else "WARN"
@@ -447,8 +438,6 @@ def cmd_doctor(args) -> int:
             line += f"  — optional — sign up: {API_KEY_SIGNUP.get(k, '(no URL)')}"
         print(line, file=sys.stderr)
 
-    # Required checks — any failure exits nonzero. Pad names to the shared
-    # width so doctor_runner's own ljust keeps the columns aligned.
     required_checks = [
         DoctorCheck(
             name=f"env {k}".ljust(width),
@@ -460,7 +449,7 @@ def cmd_doctor(args) -> int:
     return doctor_runner(required_checks, exit_on_fail=False)
 
 
-def cmd_get(args) -> int:
+def cmd_get(args: argparse.Namespace) -> int:
     """Fetch a URL's full content. Markdown by default, JSON envelope with -f json."""
     url = args.url
     is_json = getattr(args, "format", "markdown") == "json"
@@ -498,8 +487,7 @@ def cmd_get(args) -> int:
     return 0
 
 
-def _add_common_flags(parser):
-    """Add flags shared across subcommands."""
+def _add_common_flags(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("-v", "--verbose", action="store_true")
     parser.add_argument("-f", "--format", choices=["markdown", "json"], default="markdown",
                         help="Output format: markdown (file) or json (stdout)")
@@ -510,7 +498,6 @@ def _add_common_flags(parser):
 
 
 def _build_adhoc_parser() -> argparse.ArgumentParser:
-    """Parser for ad-hoc topic research (no subcommands)."""
     parser = argparse.ArgumentParser(
         prog="civic",
         description="Policy research CLI — evidence-based briefs from 8 government sources",
@@ -530,7 +517,7 @@ def main() -> int:
     load_dotenv()
     signal.signal(signal.SIGINT, handle_interrupt)
 
-    # Detect ad-hoc topic: first non-flag arg is not a known subcommand
+    # Route ad-hoc topics (e.g. `civic "AI regulation"`) without requiring a subcommand.
     known_commands = {"run", "topics", "cache", "doctor", "get", "signals"}
     first_pos = next((a for a in sys.argv[1:] if not a.startswith("-")), None)
 
@@ -556,22 +543,18 @@ Examples:
 
     subparsers = parser.add_subparsers(dest="command")
 
-    # --- civic run <name> ---
     run_parser = subparsers.add_parser("run", help="Run a named topic preset from topics.toml")
     run_parser.add_argument("name", help="Topic preset name (see: civic topics)")
     _add_common_flags(run_parser)
     run_parser.set_defaults(func=cmd_run)
 
-    # --- civic topics ---
     topics_parser = subparsers.add_parser("topics", help="List available topic presets")
     topics_parser.set_defaults(func=cmd_topics)
 
-    # --- civic cache ---
     cache_parser = subparsers.add_parser("cache", help="Manage response cache")
     cache_parser.add_argument("cache_action", choices=["stats", "clear"], help="stats | clear")
     cache_parser.set_defaults(func=cmd_cache)
 
-    # --- civic signals <preset> ---
     signals_parser = subparsers.add_parser(
         "signals",
         help="Emit atomic per-finding JSON signals (for web-pulse and other consumers)",
@@ -588,11 +571,9 @@ Examples:
     signals_parser.add_argument("-v", "--verbose", action="store_true")
     signals_parser.set_defaults(func=cmd_signals)
 
-    # --- civic doctor ---
     doctor_parser = subparsers.add_parser("doctor", help="Validate env vars + API keys")
     doctor_parser.set_defaults(func=cmd_doctor)
 
-    # --- civic get <url> ---
     get_parser = subparsers.add_parser("get", help="Fetch a URL's full content")
     get_parser.add_argument("url", help="URL to fetch")
     get_parser.add_argument("-f", "--format", choices=["markdown", "json"], default="markdown",

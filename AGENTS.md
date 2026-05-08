@@ -7,7 +7,8 @@ research (available tools, parallel) → write → review → report.md
                            ↓                       → stdout (JSON)
                      [compare mode]
                            ↓
-              research A → research B → compare → report.md
+              research A ↘
+              research B → (parallel, ≤4) → compare → report.md
 
 research (available tools, parallel) → signals envelope → stdout (JSON)
 ```
@@ -126,7 +127,7 @@ Census is still capped to up to 5 rows by the adapter.
 
 - **Retry**: tool HTTP fetches retry 3 times with exponential backoff on timeouts, connection errors, and 429/5xx; Gemini generation retries are controlled separately via `CIVIC_MAX_RETRIES` (default: 4, 429 only)
 - **Cache**: SQLite at `~/.cache/civic/cache.db`, 24h TTL, keyed on URL + params
-- **Parallel execution**: ThreadPoolExecutor, up to 8 concurrent tool calls per iteration
+- **Parallel execution**: ThreadPoolExecutor; up to 8 concurrent tool calls per research iteration, up to 4 concurrent scopes in compare mode
 - **Input validation**: Empty queries return `ToolResult(errors=[...])` and do not hit upstream APIs
 
 ## Prompts

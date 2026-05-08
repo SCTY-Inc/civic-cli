@@ -1,5 +1,3 @@
-"""Policy research agents using Gemini."""
-
 import os
 import random
 import time
@@ -11,7 +9,10 @@ from rich.console import Console
 
 from prompts import COMPARATOR, RESEARCHER, REVIEWER, WRITER
 from scopes import DEFAULT_SCOPE, Scope, compare_target_scope, scope_label
-from tools import ResearchOutput, ResearchResults, ToolRegistry, get_tool_declarations
+from tools import Finding, ResearchOutput, ResearchResults, ToolRegistry, get_tool_declarations
+
+# google-genai args type: dict[str, Any] per FunctionCall.args field definition
+_FunctionCallArgs = dict[str, object]
 
 console = Console()
 
@@ -21,12 +22,11 @@ MAX_RETRIES = int(os.getenv("CIVIC_MAX_RETRIES", "4"))
 
 
 def _retry_delay_seconds(attempt: int) -> float:
-    """Return an exponential backoff delay with jitter."""
     return (30 * (2**attempt)) + random.uniform(0, 5)
 
 
-def _generate_with_retry(client: genai.Client, **kwargs):
-    """Call client.models.generate_content with exponential backoff on 429."""
+def _generate_with_retry(client: genai.Client, **kwargs) -> types.GenerateContentResponse:
+    """Retry generate_content on 429 with exponential backoff."""
     for attempt in range(MAX_RETRIES):
         try:
             return client.models.generate_content(**kwargs)
@@ -39,13 +39,12 @@ def _generate_with_retry(client: genai.Client, **kwargs):
                 f"retrying in {delay:.0f}s[/]"
             )
             time.sleep(delay)
+    raise RuntimeError("_generate_with_retry: exhausted retries without returning or raising")
 
-# Singleton client
 _client: genai.Client | None = None
 
 
 def _get_client() -> genai.Client:
-    """Get or create Gemini client (singleton)."""
     global _client
     if _client is None:
         api_key = os.getenv("GOOGLE_API_KEY")
@@ -55,19 +54,17 @@ def _get_client() -> genai.Client:
     return _client
 
 
-def _extract_text(response) -> str:
-    """Extract text content from Gemini response."""
+def _extract_text(response: types.GenerateContentResponse) -> str:
     if not response.candidates:
         return ""
     parts = []
     for part in response.candidates[0].content.parts:
-        if hasattr(part, "text") and part.text:
+        if part.text:
             parts.append(part.text)
     return "".join(parts)
 
 
 def _scope_context(scope: Scope) -> tuple[str, str]:
-    """Return the prompt suffix and human-readable scope label."""
     label = scope_label(scope)
     if scope["type"] == "federal":
         return "\n\nFocus on FEDERAL policy only (Congress, federal agencies).", label
@@ -87,7 +84,6 @@ def research(
     scope: Scope | None = None,
     verbose: bool = False
 ) -> ResearchOutput:
-    """Research phase: runs all available tools based on scope."""
     client = _get_client()
     scope = scope or DEFAULT_SCOPE
     results = ResearchResults()
@@ -106,8 +102,8 @@ def research(
     contents = [types.Content(role="user", parts=[types.Part(text=context)])]
     tools = [types.Tool(function_declarations=tool_declarations)]
 
-    def _run_tool(fc):
-        tool_args = dict(fc.args) if fc.args else {}
+    def _run_tool(fc: types.FunctionCall) -> tuple[types.FunctionCall, tuple[list[Finding], str]]:
+        tool_args: _FunctionCallArgs = dict(fc.args) if fc.args else {}
         if verbose:
             query = tool_args.get("query", tool_args.get("topic", ""))
             console.print(f"  [dim]{fc.name}: {query}[/]")
@@ -129,10 +125,10 @@ def research(
             if not response.candidates or not response.candidates[0].content.parts:
                 return ResearchOutput(text="", results=results, scope_label=label)
 
-            func_calls = [
+            func_calls: list[types.FunctionCall] = [
                 part.function_call
                 for part in response.candidates[0].content.parts
-                if hasattr(part, "function_call") and part.function_call
+                if part.function_call is not None
             ]
 
             if not func_calls:
@@ -168,7 +164,6 @@ def research(
 
 
 def write_brief(topic: str, research_output: ResearchOutput, include_appendix: bool = True) -> str:
-    """Write policy brief from research findings."""
     client = _get_client()
 
     response = _generate_with_retry(
@@ -188,7 +183,6 @@ def write_brief(topic: str, research_output: ResearchOutput, include_appendix: b
 
 
 def review(draft: str) -> str:
-    """Review and refine the policy brief."""
     client = _get_client()
 
     response = _generate_with_retry(
@@ -209,18 +203,17 @@ def compare_research(
     questions: list[str] | None = None,
     verbose: bool = False,
 ) -> list[ResearchOutput]:
-    """Run research for multiple scopes/targets."""
-    outputs = []
-    for target in targets:
+    def _run(target: str) -> ResearchOutput:
         scope = compare_target_scope(target)
         if verbose:
             console.print(f"\n[bold]Researching: {target}[/]")
-        outputs.append(research(topic, questions, scope, verbose))
-    return outputs
+        return research(topic, questions, scope, verbose)
+
+    with ThreadPoolExecutor(max_workers=min(len(targets), 4)) as pool:
+        return list(pool.map(_run, targets))
 
 
 def write_comparison(topic: str, outputs: list[ResearchOutput]) -> str:
-    """Write comparison brief from multiple research outputs."""
     client = _get_client()
 
     sections = [f"## {o.scope_label.upper()}\n\n{o.text}" for o in outputs]

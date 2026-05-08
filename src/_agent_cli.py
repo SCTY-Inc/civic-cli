@@ -1,7 +1,3 @@
-"""Minimal CLI doctor helpers used by civic."""
-
-from __future__ import annotations
-
 import sys
 from dataclasses import dataclass
 from typing import Callable
@@ -14,30 +10,14 @@ class DoctorCheck:
     hint: str | None = None
 
 
-DoctorCheckInput = (
-    DoctorCheck
-    | tuple[str, Callable[[], bool]]
-    | tuple[str, Callable[[], bool], str | None]
-)
-
-
 def doctor_runner(
-    checks: list[DoctorCheckInput],
+    checks: list[DoctorCheck],
     *,
     exit_on_fail: bool = True,
 ) -> int:
-    """Run doctor checks, print status, and return an exit code."""
-    normalized: list[DoctorCheck] = []
-    for item in checks:
-        if isinstance(item, DoctorCheck):
-            normalized.append(item)
-            continue
-        name, check, *rest = item
-        normalized.append(DoctorCheck(name=name, check=check, hint=rest[0] if rest else None))
-
     failures = 0
-    width = max((len(check.name) for check in normalized), default=0)
-    for check in normalized:
+    width = max((len(check.name) for check in checks), default=0)
+    for check in checks:
         try:
             ok = bool(check.check())
             hint = check.hint or ""

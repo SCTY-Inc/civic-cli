@@ -1,12 +1,9 @@
-"""Data models for research findings and agent outputs."""
-
 from dataclasses import dataclass, field
 from datetime import datetime
 
 
 @dataclass
 class Finding:
-    """Single research finding with metadata."""
     title: str
     snippet: str
     url: str
@@ -14,7 +11,7 @@ class Finding:
     source_type: str = ""
     citations: int = 0
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, object]:
         return {
             "title": self.title,
             "snippet": self.snippet,
@@ -27,15 +24,12 @@ class Finding:
 
 @dataclass
 class ToolResult:
-    """Single tool execution result."""
-
     findings: list[Finding] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
 
 
 @dataclass
 class ResearchResults:
-    """Aggregated results from all tools."""
     findings: list[Finding] = field(default_factory=list)
     tool_usage: dict[str, int] = field(default_factory=dict)
 
@@ -44,7 +38,6 @@ class ResearchResults:
         self.tool_usage[tool_name] = self.tool_usage.get(tool_name, 0) + 1
 
     def confidence_score(self) -> tuple[str, str]:
-        """Calculate confidence based on source diversity and recency."""
         if not self.findings:
             return "LOW", "No findings"
 
@@ -77,7 +70,7 @@ class ResearchResults:
 
         return level, f"{dots} {level} — {len(source_types)} source types, {len(self.findings)} findings"
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, object]:
         level, detail = self.confidence_score()
         return {
             "confidence": {"level": level, "detail": detail},
@@ -92,7 +85,6 @@ class ResearchResults:
         return by_source
 
     def to_appendix(self) -> str:
-        """Format raw findings as appendix."""
         by_source = self._group_by_source()
         _, confidence_str = self.confidence_score()
         parts = [f"## Appendix: Source Data\n\n**Research Confidence:** {confidence_str}\n"]
@@ -110,7 +102,6 @@ class ResearchResults:
 
 @dataclass
 class ResearchOutput:
-    """Complete research output with metadata."""
     text: str
     results: ResearchResults
     scope_label: str = ""

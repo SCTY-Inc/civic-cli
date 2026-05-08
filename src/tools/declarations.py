@@ -1,5 +1,3 @@
-"""Gemini function declarations for tools."""
-
 import os
 from collections.abc import Mapping
 
@@ -7,7 +5,7 @@ from google.genai import types
 
 from scopes import Scope
 
-# Tool specifications - single source of truth
+# TOOL_SPECS drives both Gemini function declarations and scope filtering — single source of truth.
 TOOL_SPECS = {
     "web_search": {
         "description": "Search the web for current news, articles, and general policy information",
@@ -62,7 +60,6 @@ HARD_REQUIRED_TOOL_ENV_VARS = {
     "web_search": "EXA_API_KEY",
 }
 
-# Tool sets by scope
 SCOPE_TOOLS = {
     "news": ["web_search"],
     "policy": [
@@ -96,7 +93,6 @@ SCOPE_TOOLS = {
 
 
 def get_tool_names(scope: Scope) -> list[str]:
-    """Return declared tool names for a scope."""
     return list(SCOPE_TOOLS.get(scope["type"], SCOPE_TOOLS["all"]))
 
 
@@ -104,11 +100,10 @@ def get_available_tool_names(
     scope: Scope,
     env: Mapping[str, str] | None = None,
 ) -> list[str]:
-    """Return tools available in the current environment.
+    """Filter to tools whose API keys are present.
 
-    Sources gated by optional API keys are omitted when the key is absent. This
-    keeps the Gemini prompt aligned with the tools that can actually run.
-    LegiScan is only exposed situationally for single-state searches.
+    Keeps Gemini's tool list aligned with what can actually execute. LegiScan
+    is only included for single-state scopes (situational fallback for OpenStates).
     """
     env = env or os.environ
     available = []
@@ -130,7 +125,6 @@ def get_available_tool_names(
 
 
 def _make_declaration(name: str, description_suffix: str = "") -> types.FunctionDeclaration:
-    """Create a FunctionDeclaration from spec."""
     spec = TOOL_SPECS[name]
     description = spec["description"]
     if description_suffix:
@@ -150,7 +144,6 @@ def _make_declaration(name: str, description_suffix: str = "") -> types.Function
 
 
 def get_tool_declarations(scope: Scope) -> list[types.FunctionDeclaration]:
-    """Return Gemini function declarations based on scope and env availability."""
     scope_type = scope["type"]
     tool_names = get_available_tool_names(scope)
 

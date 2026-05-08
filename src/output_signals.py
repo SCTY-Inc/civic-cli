@@ -37,13 +37,12 @@ Schema (v1):
 }
 """
 
-from __future__ import annotations
-
 import json
 import re
+from collections.abc import Callable
 from datetime import datetime, timezone
 
-from tools.models import Finding, ResearchResults
+from tools import Finding, ResearchResults
 
 SCHEMA_VERSION = 1
 
@@ -72,9 +71,9 @@ SOURCE_TO_TOOL = {
 }
 
 
-def _extract_congress(title: str, snippet: str) -> dict:
+def _extract_congress(title: str, snippet: str) -> dict[str, str]:
     """CongressSearch formats: title='HR2406: Act name', snippet='Congress N | Status: X'."""
-    out: dict = {"jurisdiction": "federal"}
+    out: dict[str, str] = {"jurisdiction": "federal"}
     m = re.match(r"^([A-Z]+)\s*(\d+):\s*(.*)$", title or "")
     if m:
         out["identifier"] = f"{m.group(1)} {m.group(2)}"
@@ -100,9 +99,9 @@ def _extract_title_identifier(title: str) -> str:
     return re.sub(r"[^A-Za-z0-9]+", "", match.group(1))
 
 
-def _extract_fed_register(url: str, snippet: str) -> dict:
+def _extract_fed_register(url: str, snippet: str) -> dict[str, str]:
     """FR URLs: /documents/YYYY/MM/DD/DOCUMENT-ID/slug."""
-    out: dict = {"jurisdiction": "federal"}
+    out: dict[str, str] = {"jurisdiction": "federal"}
     m = re.search(r"/documents/\d{4}/\d{2}/\d{2}/([^/]+)", url or "")
     if m:
         out["identifier"] = m.group(1)
@@ -111,8 +110,8 @@ def _extract_fed_register(url: str, snippet: str) -> dict:
     return out
 
 
-def _extract_regulations(url: str, snippet: str) -> dict:
-    out: dict = {"jurisdiction": "federal"}
+def _extract_regulations(url: str, snippet: str) -> dict[str, str]:
+    out: dict[str, str] = {"jurisdiction": "federal"}
     m = re.search(r"/document/([^/?#]+)", url or "")
     if m:
         out["identifier"] = m.group(1)
@@ -121,38 +120,33 @@ def _extract_regulations(url: str, snippet: str) -> dict:
     return out
 
 
-def _extract_state_leg(title: str, snippet: str, url: str) -> dict:
+def _extract_state_bill(title: str, snippet: str, url: str, *, url_pattern: str) -> dict[str, str]:
+    out: dict[str, str] = {}
+    m = re.search(url_pattern, url or "")
+    if m:
+        out["jurisdiction"] = f"state:{m.group(1)}"
+        out["identifier"] = m.group(2)
+    else:
+        out["jurisdiction"] = "state"
+        if identifier := _extract_title_identifier(title):
+            out["identifier"] = identifier
+    if status := _extract_field(snippet, "Latest"):
+        out["status"] = status
+    return out
+
+
+def _extract_state_leg(title: str, snippet: str, url: str) -> dict[str, str]:
     """OpenStates URLs: /{ST}/bills/{session}/{bill-id}/."""
-    out: dict = {}
-    m = re.search(r"/([A-Z]{2})/bills?/[^/]+/([^/?#]+)", url or "")
-    if m:
-        out["jurisdiction"] = f"state:{m.group(1)}"
-        out["identifier"] = m.group(2)
-    else:
-        out["jurisdiction"] = "state"
-        if identifier := _extract_title_identifier(title):
-            out["identifier"] = identifier
-    if status := _extract_field(snippet, "Latest"):
-        out["status"] = status
-    return out
+    return _extract_state_bill(title, snippet, url, url_pattern=r"/([A-Z]{2})/bills?/[^/]+/([^/?#]+)")
 
 
-def _extract_legiscan(title: str, snippet: str, url: str) -> dict:
-    out: dict = {}
-    m = re.search(r"legiscan\.com/([A-Z]{2})/bill/([^/?#]+)", url or "")
-    if m:
-        out["jurisdiction"] = f"state:{m.group(1)}"
-        out["identifier"] = m.group(2)
-    else:
-        out["jurisdiction"] = "state"
-        if identifier := _extract_title_identifier(title):
-            out["identifier"] = identifier
-    if status := _extract_field(snippet, "Latest"):
-        out["status"] = status
-    return out
+def _extract_legiscan(title: str, snippet: str, url: str) -> dict[str, str]:
+    return _extract_state_bill(title, snippet, url, url_pattern=r"legiscan\.com/([A-Z]{2})/bill/([^/?#]+)")
 
 
-EXTRACTORS = {
+from collections.abc import Callable
+
+EXTRACTORS: dict[str, Callable[[Finding], dict[str, str]]] = {
     "CONGRESS": lambda f: _extract_congress(f.title, f.snippet),
     "FED_REGISTER": lambda f: _extract_fed_register(f.url, f.snippet),
     "REGULATIONS": lambda f: _extract_regulations(f.url, f.snippet),
@@ -162,7 +156,6 @@ EXTRACTORS = {
 
 
 def _stable_id(*parts: str) -> str:
-    """Deterministic ID from normalized parts."""
     normalized = []
     for part in parts:
         if not part:
@@ -202,7 +195,7 @@ def _classify_document_status(status: str) -> tuple[str, bool] | tuple[None, Non
     return "docket_document", True
 
 
-def _movement_metadata(source_type: str, extracted: dict) -> tuple[str | None, bool | None]:
+def _movement_metadata(source_type: str, extracted: dict[str, str]) -> tuple[str | None, bool | None]:
     if source_type in {"CONGRESS", "STATE_LEG", "LEGISCAN"}:
         return _classify_bill_status(str(extracted.get("status", "")))
     if source_type in {"FED_REGISTER", "REGULATIONS"}:
@@ -212,7 +205,7 @@ def _movement_metadata(source_type: str, extracted: dict) -> tuple[str | None, b
     return None, None
 
 
-def _signal_id(finding: Finding, extracted: dict, signal_kind: str | None) -> str:
+def _signal_id(finding: Finding, extracted: dict[str, str], signal_kind: str | None) -> str:
     if finding.source_type in {"CONGRESS", "STATE_LEG", "LEGISCAN"}:
         return _stable_id(
             finding.source_type,
@@ -231,10 +224,10 @@ def _signal_id(finding: Finding, extracted: dict, signal_kind: str | None) -> st
     )
 
 
-def signal_from_finding(finding: Finding) -> dict:
+def signal_from_finding(finding: Finding) -> dict[str, object]:
     extracted = EXTRACTORS.get(finding.source_type, lambda _f: {})(finding)
     signal_kind, pending = _movement_metadata(finding.source_type, extracted)
-    signal = {
+    signal: dict[str, object] = {
         "source_tool": SOURCE_TO_TOOL.get(finding.source_type, "unknown"),
         "source_type": finding.source_type,
         "source_system": SOURCE_SYSTEMS.get(
@@ -265,9 +258,9 @@ def emit_signals(
     scope_label: str,
     results: ResearchResults,
 ) -> str:
-    """Build the atomic signals JSON envelope. Dedupes by stable signal ID."""
+    """Build atomic signals JSON envelope. Dedupes findings by stable signal ID."""
     seen: set[str] = set()
-    signals: list[dict] = []
+    signals: list[dict[str, object]] = []
     for f in results.findings:
         signal = signal_from_finding(f)
         key = str(signal.get("id", ""))
@@ -294,7 +287,7 @@ def emit_signals(
     return json.dumps(envelope, indent=2, ensure_ascii=False)
 
 
-def _counts_by_source(signals: list[dict]) -> dict[str, int]:
+def _counts_by_source(signals: list[dict[str, object]]) -> dict[str, int]:
     out: dict[str, int] = {}
     for s in signals:
         out[s["source_type"]] = out.get(s["source_type"], 0) + 1
