@@ -13,6 +13,8 @@ uv run civic "topic" -s policy   # policy-primary sources only
 uv run civic "topic" -v          # verbose
 uv run civic "topic" -f json     # JSON output (for agents)
 uv run civic "topic" --limit 10  # per-tool results cap (default 25)
+uv run civic "topic" --since 2026-01-01  # filter results to items on/after date
+uv run civic "topic" --no-review # skip reviewer pass (faster)
 uv run civic -                   # read topic from stdin
 uv run civic run <preset>        # run named preset (markdown brief)
 uv run civic signals <preset>    # atomic per-finding JSON (for web-pulse, etc.)
@@ -26,7 +28,7 @@ uv run civic cache clear         # purge cached responses
 
 Honors `NO_COLOR` and auto-disables Rich formatting when stdout is not a TTY.
 
-`civic signals` accepts either a preset name from `topics.toml` or `--topic` for ad-hoc use. The ad-hoc path also accepts `--scope`, `--compare`, `--questions`, `--limit`, and `--verbose`. Signals mode skips write/review and emits the research findings as atomic JSON. For Pulse, `pulse-policy-weekly` now uses `scope = "policy"` and emits movement-oriented metadata such as `status`, `signal_kind`, `pending`, and movement-aware IDs for bill-like items.
+`civic signals` accepts either a preset name from `topics.toml` or `--topic` for ad-hoc use. The ad-hoc path also accepts `--scope`, `--compare`, `--questions`, `--limit`, `--since`, and `--verbose`. Signals mode skips write/review and emits the research findings as atomic JSON. For Pulse, `pulse-policy-weekly` now uses `scope = "policy"` and emits movement-oriented metadata such as `status`, `signal_kind`, `pending`, and movement-aware IDs for bill-like items.
 
 ## Files
 

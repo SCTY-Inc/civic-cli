@@ -3,8 +3,8 @@
 Policy research CLI. Generates evidence-based briefs from 8 government and academic sources.
 
 ```
-topic → research (8 APIs) → write → review → report.md
-                                           → stdout (JSON)
+topic → research (8 APIs) → write → [review] → report.md
+                                              → stdout (JSON)
 ```
 
 ## Install
@@ -70,8 +70,8 @@ Pulse's `pulse-policy-weekly` preset now runs with `scope = "policy"`, so it fav
 Signal inputs:
 - positional `preset` from `topics.toml`, or `--topic` for ad-hoc use
 - with `--topic`: `-s/--scope`, `-c/--compare`, `-q/--questions`
-- optional: `--limit`, `-v`
-- Pulse currently shells `civic signals <preset> [--limit N]`
+- optional: `--limit`, `--since YYYY-MM-DD`, `-v`
+- Pulse currently shells `civic signals <preset> [--limit N] [--since YYYY-MM-DD]`
 
 Bill-like signals include movement metadata when available:
 - `status` — latest bill/rule action text
@@ -126,6 +126,8 @@ civic run ai-regulation-federal -f json        # preset with JSON output
 -v, --verbose          show tool calls
 --sources              show confidence score + source usage
 --no-appendix          exclude source appendix from output
+--no-review            skip the reviewer pass (faster; lower polish)
+--since YYYY-MM-DD     filter results to items published on/after date
 --limit N              per-tool results cap (default: 25)
 -V, --version
 ```
@@ -154,7 +156,7 @@ civic cache clear                              # purge all cached responses
 - **Atomic signals JSON**: Stable per-finding envelope for web-pulse ingestion and other downstream consumers
 - **Policy movement metadata**: bill/rule signals include status, normalized movement kind, pending state, and movement-aware IDs
 - **Comparison matrix**: Side-by-side analysis for --compare mode
-- **Response caching**: 24h SQLite cache at `~/.cache/civic/` — repeat queries are instant
+- **Response caching**: 24h SQLite cache at `~/.cache/civic/` — repeat queries are instant; cache keyed on URL + params with API keys stripped so it survives key rotation
 
 ## Tools
 
@@ -162,7 +164,7 @@ civic cache clear                              # purge all cached responses
 |------|--------|------|
 | web_search | Exa | news, articles |
 | academic_search | Semantic Scholar | 200M+ papers |
-| census_search | US Census | demographics, income, housing (18 variables) |
+| census_search | US Census | demographics, income, housing (17 variables) |
 | congress_search | Congress.gov | federal bills |
 | federal_register_search | Federal Register | rules, notices |
 | regulations_search | Regulations.gov | dockets, comments, rulemaking |
@@ -206,6 +208,7 @@ tests/
 
 | Date | Change |
 |------|--------|
+| **2026-05-07** | **code quality + features** — `--since` date filter (web, congress, fed-register, regulations, court), `--no-review` flag, URL-based finding dedup (bill sources exempt), dynamic RESEARCHER prompt scoped to available tools, cache key strips API keys, tool declarations cached by scope |
 | **2026-04-22** | **post-audit fixes** — Rich JSON-mode compatibility, Exa SDK update, signals docs for web-pulse, env-aware source gating, packaged presets, CI, LegiScan single-state fallback |
 | **2026-04-09** | **v0.6** — 8th source (Regulations.gov), `--format json`, parallel execution, retry/caching, 18 Census variables, 41 tests |
 | **2026-01-28** | **v0.5** — topics.toml presets, `run`/`topics` subcommands, gemini-2.0-flash |

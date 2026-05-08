@@ -14,7 +14,7 @@ research (available tools, parallel) → signals envelope → stdout (JSON)
 ```
 
 Signals mode reuses the normal research phase and skips only the writer/reviewer steps.
-Inputs are either a preset name from `topics.toml` or an ad-hoc `--topic` plus the usual `--scope`, `--compare`, `--questions`, `--limit`, and `--verbose` flags.
+Inputs are either a preset name from `topics.toml` or an ad-hoc `--topic` plus the usual `--scope`, `--compare`, `--questions`, `--limit`, `--since`, and `--verbose` flags.
 For Pulse, `pulse-policy-weekly` now runs with `scope = "policy"` so the feed favors concrete policy movement from Congress, Federal Register, Regulations.gov, courts, and state legislation.
 
 ## 1. Researcher
@@ -30,11 +30,13 @@ Tools by scope:
 | policy | congress, federal_register, regulations, court, state_legislation |
 
 Behavior:
-- MUST use ALL available tools (enforced via prompt)
+- MUST use ALL available tools (enforced via prompt; prompt is built dynamically from actual available tools so Gemini never sees or attempts unavailable ones)
 - Tools gated by optional API keys are omitted from Gemini's tool list when the key is missing
 - ToolRegistry only executes tools that are available for the requested scope; undeclared/out-of-scope tool calls are rejected
 - Parallel tool execution via ThreadPoolExecutor
 - Tool adapters return `ToolResult(findings, errors)`; only successful findings are added to `ResearchResults`
+- Findings are deduplicated by URL within `ResearchResults.add()` — bill sources (CONGRESS, STATE_LEG, LEGISCAN) are exempt since the same URL can carry distinct status events
+- `--since YYYY-MM-DD` filters results at the adapter level for: web_search, congress_search, federal_register_search, regulations_search, court_search
 - Returns `ResearchOutput` with findings + metadata
 - Tracks tool usage for --sources audit
 - Max iterations configurable via `CIVIC_MAX_ITERATIONS` (default: 15)
@@ -89,6 +91,7 @@ class ToolResult:
 class ResearchResults:
     findings: list[Finding]
     tool_usage: dict[str, int]
+    # _seen_urls deduplicates by URL on add(); bill sources exempt
 
     def confidence_score() -> (level, explanation)
     def to_dict() -> dict      # for JSON output
@@ -126,16 +129,16 @@ Census is still capped to up to 5 rows by the adapter.
 ## Infrastructure
 
 - **Retry**: tool HTTP fetches retry 3 times with exponential backoff on timeouts, connection errors, and 429/5xx; Gemini generation retries are controlled separately via `CIVIC_MAX_RETRIES` (default: 4, 429 only)
-- **Cache**: SQLite at `~/.cache/civic/cache.db`, 24h TTL, keyed on URL + params
+- **Cache**: SQLite at `~/.cache/civic/cache.db`, 24h TTL, keyed on URL + params (API key params stripped before hashing so cache survives key rotation)
 - **Parallel execution**: ThreadPoolExecutor; up to 8 concurrent tool calls per research iteration, up to 4 concurrent scopes in compare mode
 - **Input validation**: Empty queries return `ToolResult(errors=[...])` and do not hit upstream APIs
 
 ## Prompts
 
 `src/prompts.py`:
-- `RESEARCHER` — tool usage, output format
+- `build_researcher_prompt(tool_declarations)` — dynamically builds RESEARCHER from `RESEARCHER_HEADER` + available tool list + `RESEARCHER_FOOTER`
 - `WRITER` — brief structure
-- `REVIEWER` — quality checks
+- `REVIEWER` — quality checks (skipped when `--no-review`)
 - `COMPARATOR` — comparison analysis
 
 ## Agent Integration

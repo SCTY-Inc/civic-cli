@@ -1,3 +1,4 @@
+import functools
 import os
 import random
 import time
@@ -7,7 +8,7 @@ from google import genai
 from google.genai import errors, types
 from rich.console import Console
 
-from prompts import COMPARATOR, RESEARCHER, REVIEWER, WRITER
+from prompts import COMPARATOR, REVIEWER, WRITER, build_researcher_prompt
 from scopes import DEFAULT_SCOPE, Scope, compare_target_scope, scope_label
 from tools import Finding, ResearchOutput, ResearchResults, ToolRegistry, get_tool_declarations
 
@@ -78,11 +79,18 @@ def _scope_context(scope: Scope) -> tuple[str, str]:
     return "\n\nSearch BOTH federal and state policy sources.", label
 
 
+@functools.lru_cache(maxsize=8)
+def _cached_tool_declarations(scope_type: str, scope_states: tuple[str, ...]) -> list:
+    scope: Scope = {"type": scope_type, "states": list(scope_states)}
+    return get_tool_declarations(scope)
+
+
 def research(
     topic: str,
     questions: list[str] | None = None,
     scope: Scope | None = None,
-    verbose: bool = False
+    verbose: bool = False,
+    since: str | None = None,
 ) -> ResearchOutput:
     client = _get_client()
     scope = scope or DEFAULT_SCOPE
@@ -96,14 +104,17 @@ def research(
     scope_context, label = _scope_context(scope)
     context += scope_context
 
-    tool_declarations = get_tool_declarations(scope)
+    tool_declarations = _cached_tool_declarations(scope["type"], tuple(scope.get("states", [])))
     tool_registry = ToolRegistry(scope)
+    researcher_prompt = build_researcher_prompt(tool_declarations)
 
     contents = [types.Content(role="user", parts=[types.Part(text=context)])]
     tools = [types.Tool(function_declarations=tool_declarations)]
 
     def _run_tool(fc: types.FunctionCall) -> tuple[types.FunctionCall, tuple[list[Finding], str]]:
         tool_args: _FunctionCallArgs = dict(fc.args) if fc.args else {}
+        if since:
+            tool_args["since"] = since
         if verbose:
             query = tool_args.get("query", tool_args.get("topic", ""))
             console.print(f"  [dim]{fc.name}: {query}[/]")
@@ -116,7 +127,7 @@ def research(
                 model=MODEL,
                 contents=contents,
                 config=types.GenerateContentConfig(
-                    system_instruction=RESEARCHER,
+                    system_instruction=researcher_prompt,
                     tools=tools,
                     max_output_tokens=4096,
                 ),
@@ -202,12 +213,13 @@ def compare_research(
     targets: list[str],
     questions: list[str] | None = None,
     verbose: bool = False,
+    since: str | None = None,
 ) -> list[ResearchOutput]:
     def _run(target: str) -> ResearchOutput:
         scope = compare_target_scope(target)
         if verbose:
             console.print(f"\n[bold]Researching: {target}[/]")
-        return research(topic, questions, scope, verbose)
+        return research(topic, questions, scope, verbose, since)
 
     with ThreadPoolExecutor(max_workers=min(len(targets), 4)) as pool:
         return list(pool.map(_run, targets))

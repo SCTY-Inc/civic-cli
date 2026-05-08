@@ -144,7 +144,7 @@ class TestRunPipeline:
         monkeypatch.setattr(
             cli,
             "research",
-            lambda topic, questions, scope, verbose: ResearchOutput(
+            lambda topic, questions, scope, verbose, since=None: ResearchOutput(
                 text="Research text",
                 results=results,
                 scope_label="federal + state",

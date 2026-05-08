@@ -38,8 +38,12 @@ def _get_cache_db() -> sqlite3.Connection:
     return db
 
 
+_CACHE_SKIP_PARAMS = frozenset({"api_key", "key"})
+
+
 def _cache_key(url: str, params: Mapping[str, object] | None) -> str:
-    raw = json.dumps({"url": url, "params": dict(params or {})}, sort_keys=True)
+    clean = {k: v for k, v in (params or {}).items() if k not in _CACHE_SKIP_PARAMS}
+    raw = json.dumps({"url": url, "params": clean}, sort_keys=True)
     return hashlib.sha256(raw.encode()).hexdigest()
 
 

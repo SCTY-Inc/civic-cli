@@ -183,6 +183,8 @@ def run_pipeline(
     no_appendix: bool = False,
     output_format: str = "markdown",
     limit: int | None = None,
+    no_review: bool = False,
+    since: str | None = None,
 ) -> int:
     """Run the full research pipeline. Returns exit code."""
     if limit:
@@ -215,7 +217,7 @@ def run_pipeline(
                 console.print(f"[dim]{' vs '.join(compare_targets)}[/]\n")
 
             with _status("[dim]Researching...", enabled=not is_json):
-                outputs = compare_research(topic, compare_targets, questions, verbose and not is_json)
+                outputs = compare_research(topic, compare_targets, questions, verbose and not is_json, since)
 
             if is_json:
                 all_results = {}
@@ -248,7 +250,7 @@ def run_pipeline(
                 console.print(f"[dim]Scope: {label}[/]\n")
 
             with _status("[dim]Researching...", enabled=not is_json):
-                research_output = research(topic, questions, scope=scope, verbose=verbose and not is_json)
+                research_output = research(topic, questions, scope=scope, verbose=verbose and not is_json, since=since)
 
             if is_json:
                 results_dict = research_output.results.to_dict()
@@ -264,9 +266,11 @@ def run_pipeline(
                 draft = write_brief(topic, research_output, include_appendix=not no_appendix)
             console.print("[green]✓[/] Draft")
 
-            with _status("[dim]Reviewing...", enabled=True):
-                final = review(draft)
-            console.print("[green]✓[/] Review")
+            if not no_review:
+                with _status("[dim]Reviewing...", enabled=True):
+                    draft = review(draft)
+                console.print("[green]✓[/] Review")
+            final = draft
 
         out = Path(output_path)
         out.parent.mkdir(parents=True, exist_ok=True)
@@ -303,6 +307,8 @@ def cmd_run(args: argparse.Namespace) -> int:
         no_appendix=args.no_appendix,
         output_format=getattr(args, "format", "markdown"),
         limit=getattr(args, "limit", None),
+        no_review=getattr(args, "no_review", False),
+        since=getattr(args, "since", None),
     )
 
 
@@ -356,6 +362,8 @@ def cmd_research(args: argparse.Namespace) -> int:
         no_appendix=args.no_appendix,
         output_format=args.format,
         limit=getattr(args, "limit", None),
+        no_review=getattr(args, "no_review", False),
+        since=getattr(args, "since", None),
     )
 
 
@@ -395,12 +403,14 @@ def cmd_signals(args: argparse.Namespace) -> int:
     if args.limit:
         set_results_limit(args.limit)
 
+    since = getattr(args, "since", None)
+
     def _body() -> int:
         if compare_targets:
-            outputs = compare_research(topic, compare_targets, questions, verbose=args.verbose)
+            outputs = compare_research(topic, compare_targets, questions, verbose=args.verbose, since=since)
             results, label = _merge_compare_results(outputs, compare_str)
         else:
-            research_output = research(topic, questions, scope=scope, verbose=args.verbose)
+            research_output = research(topic, questions, scope=scope, verbose=args.verbose, since=since)
             label = research_output.scope_label
             results = research_output.results
 
@@ -493,6 +503,10 @@ def _add_common_flags(parser: argparse.ArgumentParser) -> None:
                         help="Output format: markdown (file) or json (stdout)")
     parser.add_argument("--sources", action="store_true")
     parser.add_argument("--no-appendix", action="store_true")
+    parser.add_argument("--no-review", action="store_true",
+                        help="Skip the reviewer pass (faster; lower polish)")
+    parser.add_argument("--since", metavar="YYYY-MM-DD", default=None,
+                        help="Filter results to items published on or after this date")
     parser.add_argument("--limit", type=int, default=None,
                         help="Per-tool results limit (default: 25)")
 
@@ -568,6 +582,8 @@ Examples:
     signals_parser.add_argument("-q", "--questions", nargs="+", metavar="Q")
     signals_parser.add_argument("--limit", type=int, default=None,
                                  help="Per-tool results limit (default: 25)")
+    signals_parser.add_argument("--since", metavar="YYYY-MM-DD", default=None,
+                                 help="Filter results to items published on or after this date")
     signals_parser.add_argument("-v", "--verbose", action="store_true")
     signals_parser.set_defaults(func=cmd_signals)
 

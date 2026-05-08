@@ -28,12 +28,24 @@ class ToolResult:
     errors: list[str] = field(default_factory=list)
 
 
+_GENERIC_URLS = frozenset({"https://data.census.gov"})
+# Bill sources emit multiple findings per URL (one per movement/status change) — never dedup by URL.
+_BILL_SOURCE_TYPES = frozenset({"CONGRESS", "STATE_LEG", "LEGISCAN"})
+
+
 @dataclass
 class ResearchResults:
     findings: list[Finding] = field(default_factory=list)
     tool_usage: dict[str, int] = field(default_factory=dict)
+    _seen_urls: set[str] = field(default_factory=set, repr=False, compare=False, init=False)
 
     def add(self, finding: Finding, tool_name: str):
+        if finding.source_type not in _BILL_SOURCE_TYPES:
+            url = finding.url
+            if url and len(url) > 30 and url not in _GENERIC_URLS:
+                if url in self._seen_urls:
+                    return
+                self._seen_urls.add(url)
         self.findings.append(finding)
         self.tool_usage[tool_name] = self.tool_usage.get(tool_name, 0) + 1
 

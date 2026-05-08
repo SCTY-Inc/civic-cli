@@ -104,13 +104,16 @@ class WebSearch(BaseTool):
             return self._error("No query provided")
         if not os.getenv("EXA_API_KEY"):
             return self._missing_api_key("EXA_API_KEY")
+        since: str | None = kwargs.get("since")
         try:
-            results = self.client.search(
-                query,
-                type="auto",
-                num_results=_base.RESULTS_LIMIT,
-                contents={"text": {"max_characters": 1500}},
-            )
+            search_kwargs: dict[str, object] = {
+                "type": "auto",
+                "num_results": _base.RESULTS_LIMIT,
+                "contents": {"text": {"max_characters": 1500}},
+            }
+            if since:
+                search_kwargs["start_published_date"] = since
+            results = self.client.search(query, **search_kwargs)
         except ValueError as error:
             return self._error(f"Exa API error: {error}")
 
@@ -189,11 +192,12 @@ class CongressSearch(BaseTool):
             return self._missing_api_key("CONGRESS_GOV_API_KEY")
         if not query:
             return self._error("No query provided")
+        since: str | None = kwargs.get("since")
+        params: dict[str, object] = {"query": query, "limit": _base.RESULTS_LIMIT, "api_key": api_key}
+        if since:
+            params["fromDateTime"] = f"{since}T00:00:00Z"
         try:
-            data = self._fetch_json(
-                f"{self.BASE_URL}/bill",
-                params={"query": query, "limit": _base.RESULTS_LIMIT, "api_key": api_key},
-            )
+            data = self._fetch_json(f"{self.BASE_URL}/bill", params=params)
         except httpx.HTTPError as error:
             return self._http_error("Congress.gov", error)
 
@@ -227,15 +231,16 @@ class FederalRegisterSearch(BaseTool):
     def execute(self, query: str = "", **kwargs) -> ToolResult:
         if not query:
             return self._error("No query provided")
+        since: str | None = kwargs.get("since")
+        fr_params: dict[str, object] = {
+            "conditions[term]": query,
+            "per_page": _base.RESULTS_LIMIT,
+            "order": "relevance",
+        }
+        if since:
+            fr_params["conditions[publication_date][gte]"] = since
         try:
-            data = self._fetch_json(
-                f"{self.BASE_URL}/documents.json",
-                params={
-                    "conditions[term]": query,
-                    "per_page": _base.RESULTS_LIMIT,
-                    "order": "relevance",
-                },
-            )
+            data = self._fetch_json(f"{self.BASE_URL}/documents.json", params=fr_params)
         except httpx.HTTPError as error:
             return self._http_error("Federal Register", error)
 
@@ -275,15 +280,16 @@ class RegulationsSearch(BaseTool):
             return self._missing_api_key("REGULATIONS_GOV_API_KEY")
         if not query:
             return self._error("No query provided")
+        since: str | None = kwargs.get("since")
+        reg_params: dict[str, object] = {
+            "filter[searchTerm]": query,
+            "page[size]": max(5, _base.RESULTS_LIMIT),
+            "api_key": api_key,
+        }
+        if since:
+            reg_params["filter[postedDate][ge]"] = since
         try:
-            data = self._fetch_json(
-                f"{self.BASE_URL}/documents",
-                params={
-                    "filter[searchTerm]": query,
-                    "page[size]": max(5, _base.RESULTS_LIMIT),
-                    "api_key": api_key,
-                },
-            )
+            data = self._fetch_json(f"{self.BASE_URL}/documents", params=reg_params)
         except httpx.HTTPError as error:
             return self._http_error("Regulations.gov", error)
 
@@ -320,16 +326,17 @@ class CourtSearch(BaseTool):
     def execute(self, query: str = "", **kwargs) -> ToolResult:
         if not query:
             return self._error("No query provided")
+        since: str | None = kwargs.get("since")
+        court_params: dict[str, object] = {
+            "q": query,
+            "type": "o",
+            "order_by": "score desc",
+            "page_size": _base.RESULTS_LIMIT,
+        }
+        if since:
+            court_params["filed_after"] = since
         try:
-            data = self._fetch_json(
-                f"{self.BASE_URL}/search/",
-                params={
-                    "q": query,
-                    "type": "o",
-                    "order_by": "score desc",
-                    "page_size": _base.RESULTS_LIMIT,
-                },
-            )
+            data = self._fetch_json(f"{self.BASE_URL}/search/", params=court_params)
         except httpx.HTTPError as error:
             return self._http_error("CourtListener", error)
 

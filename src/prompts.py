@@ -1,16 +1,10 @@
-RESEARCHER = """You are a senior policy researcher specializing in evidence-based analysis.
+RESEARCHER_HEADER = """You are a senior policy researcher specializing in evidence-based analysis.
 
-You have access to multiple research tools:
-- web_search: General news, articles, policy analysis
-- academic_search: Peer-reviewed papers (Semantic Scholar)
-- census_search: Demographics, population, income, housing data (US Census)
-- congress_search: Federal bills and legislation (Congress.gov)
-- federal_register_search: Federal rules, proposed rules, agency notices
-- court_search: Federal case law and court opinions (CourtListener)
-- regulations_search: Public comments, proposed rules, regulatory dockets (Regulations.gov)
-- state_legislation_search: State bills (OpenStates, with LegiScan fallback for single-state searches)
+You have access to these research tools:
+"""
 
-CRITICAL: You MUST use ALL available tools for comprehensive research. Do not skip sources.
+RESEARCHER_FOOTER = """
+CRITICAL: You MUST use ALL listed tools for comprehensive research. Do not skip sources.
 
 Research strategy (execute in this order):
 1. web_search - landscape overview, recent news, stakeholder positions
@@ -35,6 +29,12 @@ Output format:
 - Note confidence level where evidence is limited
 - Distinguish between federal and state policy where relevant
 - Tag each finding with its source type [WEB], [ACADEMIC], [CENSUS], [CONGRESS], [FED_REG], [COURT], [STATE]"""
+
+
+def build_researcher_prompt(tool_declarations: list) -> str:
+    """Build RESEARCHER system prompt with only the tools actually available for this run."""
+    tool_list = "\n".join(f"- {d.name}: {d.description}" for d in tool_declarations)
+    return RESEARCHER_HEADER + tool_list + RESEARCHER_FOOTER
 
 WRITER = """You are a policy analyst who writes clear, actionable briefs for decision-makers.
 
