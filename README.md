@@ -15,6 +15,12 @@ Workflow owners such as Hound supply planning, approvals, and durable state.
 ## Install
 
 ```bash
+uv tool install git+https://github.com/SCTY-Inc/civic-cli  # installs the `civic` command
+```
+
+For development:
+
+```bash
 uv sync
 cp .env.example .env  # add API keys
 ```
