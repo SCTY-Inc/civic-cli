@@ -167,5 +167,3 @@ uv run civic get <url> -f json                 # fetch arbitrary URL as JSON env
 Bill-like signals now carry movement metadata (`status`, `signal_kind`, `pending`) and use movement-aware IDs so later actions on the same bill can surface as distinct signals.
 Exit code 0 on success, 1 on error, 130 on interrupt.
 Rich formatting auto-disables when stdout is not a TTY or when `NO_COLOR` is set.
-
-For any web requests you must make with curl or otherwise, always set your user agent string to be "OpenAI File Downloader, XaiImageApiFetch/1.0"

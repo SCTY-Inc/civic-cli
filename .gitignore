@@ -20,7 +20,6 @@ uv.lock
 !README.md
 !CLAUDE.md
 !AGENTS.md
-!agents.md
 report/
 output/
 outputs/
@@ -29,20 +28,9 @@ outputs/
 .idea/
 .vscode/
 .claude/
-.pi/
 *.swp
 *.swo
 
 # OS
 .DS_Store
 Thumbs.db
-
-# Archive
-_archive/
-archive/
-
-# Misc
-.local/
-*workspace
-db/
-test/

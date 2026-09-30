@@ -42,7 +42,7 @@ No key needed: Semantic Scholar, Federal Register, CourtListener.
 ## Usage
 
 ```bash
-civic "Solar energy policy"                    # all sources
+civic "Solar energy policy"                    # all sources (default scope)
 civic "AI regulation" -s federal               # federal only
 civic "Rent control" -s state:CA,NY            # specific states
 civic "Housing" -q "Impact of zoning reform?"  # with questions
@@ -131,7 +131,7 @@ civic run ai-regulation-federal -f json        # preset with JSON output
 ## Options
 
 ```
--s, --scope SCOPE      federal | state:XX | all | news | policy (default)
+-s, --scope SCOPE      federal | state:XX | all | news | policy (default: all)
 -c, --compare A,B      compare targets: CA,NY or federal,CA or policy,news
 -f, --format FMT       markdown (file) | json (stdout)
 -o, --output FILE      default: outputs/report.md
@@ -162,22 +162,20 @@ civic cache stats                              # show cache size + entries
 civic cache clear                              # purge all cached responses
 ```
 
-## Output Features
+## Output
 
-- **Confidence scoring**: HIGH/MEDIUM/LOW based on source diversity, recency, citations
-- **Source appendix**: Raw findings with dates and URLs for verification
-- **Atomic signals JSON**: Stable per-finding envelope for web-pulse ingestion and other downstream consumers
-- **Policy movement metadata**: bill/rule signals include status, normalized movement kind, pending state, and movement-aware IDs
-- **Comparison matrix**: Side-by-side analysis for --compare mode
-- **Response caching**: 24h SQLite cache at `~/.cache/civic/` — repeat queries are instant; cache keyed on URL + params with API keys stripped so it survives key rotation
+- Confidence level (HIGH/MEDIUM/LOW) from source diversity, recency, citations
+- Source appendix with dates and URLs
+- Atomic signals JSON (`civic signals`), with bill/rule movement metadata (`status`, `signal_kind`, `pending`)
+- Responses cached 24h in SQLite at `~/.cache/civic/`; keys are stripped from the cache key
 
 ## Tools
 
 | Tool | Source | Data |
 |------|--------|------|
 | web_search | Exa | news, articles |
-| academic_search | Semantic Scholar | 200M+ papers |
-| census_search | US Census | demographics, income, housing (17 variables) |
+| academic_search | Semantic Scholar | papers |
+| census_search | US Census | demographics, income, housing |
 | congress_search | Congress.gov | federal bills |
 | federal_register_search | Federal Register | rules, notices |
 | regulations_search | Regulations.gov | dockets, comments, rulemaking |
@@ -190,52 +188,7 @@ civic cache clear                              # purge all cached responses
 |---------|---------|---------|
 | CIVIC_MODEL | gemini-3.1-flash-lite-preview | Gemini model for all phases |
 | CIVIC_MAX_ITERATIONS | 15 | Max tool calls per research phase |
-
-## Structure
-
-```
-src/
-├── cli.py               # entry, scope/compare parsing, run/signals/doctor/get
-├── _agent_cli.py        # minimal doctor helpers shared by the CLI
-├── agents.py            # gemini orchestration, parallel tool execution
-├── scopes.py            # shared scope parsing + labeling helpers
-├── prompts.py           # RESEARCHER, WRITER, REVIEWER, COMPARATOR
-├── output.py            # markdown + JSON output (brief mode)
-├── output_signals.py    # per-finding atomic JSON (schema v1 for web-pulse)
-└── tools/
-    ├── models.py        # Finding, ToolResult, ResearchResults
-    ├── declarations.py  # Gemini function specs
-    ├── implementations.py  # 8 tool classes
-    ├── registry.py      # ToolRegistry + ToolResult formatting
-    └── base.py          # BaseTool, ToolResult helpers, retry, caching, set_results_limit
-tests/
-├── test_agents.py       # scope labeling helpers
-├── test_cli.py          # scope parsing, env checks, JSON-mode regressions
-├── test_models.py       # Finding, ResearchResults, confidence
-├── test_output_signals.py # atomic signal schema + extractor behavior
-├── test_scopes.py       # shared scope parsing + labels
-└── test_tools.py        # tools, provider errors, limits, registry filtering with mocked HTTP
-```
-
-## Changelog
-
-| Date | Change |
-|------|--------|
-| **2026-07-21** | **v0.6.1** — deterministic `signals --direct` source fan-out for Hound and other workflow owners; no Gemini required |
-| **2026-05-07** | **code quality + features** — `--since` date filter (web, congress, fed-register, regulations, court), `--no-review` flag, URL-based finding dedup (bill sources exempt), dynamic RESEARCHER prompt scoped to available tools, cache key strips API keys, tool declarations cached by scope |
-| **2026-04-22** | **post-audit fixes** — Rich JSON-mode compatibility, Exa SDK update, signals docs for web-pulse, env-aware source gating, packaged presets, CI, LegiScan single-state fallback |
-| **2026-04-09** | **v0.6** — 8th source (Regulations.gov), `--format json`, parallel execution, retry/caching, 18 Census variables, 41 tests |
-| **2026-01-28** | **v0.5** — topics.toml presets, `run`/`topics` subcommands, gemini-2.0-flash |
-| **2026-01-25** | **v0.4** — Compare mode (`--compare CA,NY`), confidence scoring, source appendix, refactored tools/ package |
-| **2026-01-25** | **v0.3** — 7 API tools: Exa, Semantic Scholar, Congress.gov, Federal Register, CourtListener, Census, OpenStates |
-| **2026-01-25** | **v0.2** — Rewrite: CrewAI → vanilla Python + Gemini. Streamlit UI → CLI. 50+ deps → 5 deps |
-| **2023-12-27** | **v0.1** — Initial commit: CrewAI trip planning demo |
-
-**Key metrics:**
-- Dependencies: 50+ → 5
-- Install size: 918MB → ~50MB
-- Data sources: 1 (web) → 8 (gov + academic APIs)
-- Tests: 0 → 74
+| CIVIC_MAX_RETRIES | 4 | Gemini retries on 429 |
 
 ## License
 
