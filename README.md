@@ -31,7 +31,7 @@ cp .env.example .env  # add API keys
 |-----|-------------|--------|------|
 | GOOGLE_API_KEY | Brief/research mode only; not used by `signals --direct` | [aistudio.google.com/apikey](https://aistudio.google.com/apikey) | Free |
 | EXA_API_KEY | When scope includes web search (`all`, `federal`, `state:XX`, `news`) | [dashboard.exa.ai/api-keys](https://dashboard.exa.ai/api-keys) | Free tier |
-| CONGRESS_GOV_API_KEY | Optional — unlocks Congress.gov source | [api.congress.gov/sign-up](https://api.congress.gov/sign-up) | Free |
+| GOVINFO_API_KEY | Optional — unlocks federal bill search (GovInfo; links to congress.gov) | [api.data.gov/signup](https://api.data.gov/signup/) | Free |
 | OPENSTATES_API_KEY | Optional — unlocks OpenStates source | [openstates.org/accounts/register](https://openstates.org/accounts/register/) | Free |
 | LEGISCAN_API_KEY | Optional — situational fallback for single-state legislation searches | LegiScan account | Free public tier |
 | REGULATIONS_GOV_API_KEY | Optional — unlocks Regulations.gov source | [open.gsa.gov/api/regulationsgov/](https://open.gsa.gov/api/regulationsgov/) | Free |

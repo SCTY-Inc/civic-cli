@@ -71,7 +71,7 @@ class TestCheckEnv:
     def test_federal_does_not_require_optional_keys(self, monkeypatch):
         monkeypatch.setenv("GOOGLE_API_KEY", "x")
         monkeypatch.setenv("EXA_API_KEY", "x")
-        monkeypatch.delenv("CONGRESS_GOV_API_KEY", raising=False)
+        monkeypatch.delenv("GOVINFO_API_KEY", raising=False)
         missing = check_env({"type": "federal", "states": []})
         assert missing == []
 
@@ -103,7 +103,7 @@ class TestTopics:
 
     def test_declarations_skip_optional_tools_without_keys(self, monkeypatch):
         monkeypatch.setenv("EXA_API_KEY", "x")
-        monkeypatch.delenv("CONGRESS_GOV_API_KEY", raising=False)
+        monkeypatch.delenv("GOVINFO_API_KEY", raising=False)
         monkeypatch.delenv("OPENSTATES_API_KEY", raising=False)
         monkeypatch.delenv("LEGISCAN_API_KEY", raising=False)
         monkeypatch.delenv("REGULATIONS_GOV_API_KEY", raising=False)

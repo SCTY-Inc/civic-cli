@@ -10,6 +10,8 @@ class Finding:
     date: str = ""
     source_type: str = ""
     citations: int = 0
+    jurisdiction: str = ""  # "federal" or "state:XX" for bill sources
+    official_url: str = ""  # legislature-owned page, when the primary url is an aggregator
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -19,6 +21,8 @@ class Finding:
             "date": self.date,
             "source_type": self.source_type,
             "citations": self.citations,
+            "jurisdiction": self.jurisdiction,
+            "official_url": self.official_url,
         }
 
 
@@ -37,6 +41,7 @@ _BILL_SOURCE_TYPES = frozenset({"CONGRESS", "STATE_LEG", "LEGISCAN"})
 class ResearchResults:
     findings: list[Finding] = field(default_factory=list)
     tool_usage: dict[str, int] = field(default_factory=dict)
+    errors: list[dict[str, str]] = field(default_factory=list)  # {"source_tool", "error"}
     _seen_urls: set[str] = field(default_factory=set, repr=False, compare=False, init=False)
 
     def add(self, finding: Finding, tool_name: str):

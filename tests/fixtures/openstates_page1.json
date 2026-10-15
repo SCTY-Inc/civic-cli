@@ -1,0 +1,82 @@
+{
+ "results": [
+  {
+   "identifier": "HB 455",
+   "title": "Regards the operation of public schools and the DEW",
+   "session": "136",
+   "latest_action_description": "Effective 10/9/26",
+   "latest_action_date": "2026-10-09T04:00:00+00:00",
+   "openstates_url": "https://openstates.org/oh/bills/136/HB455/",
+   "jurisdiction": {
+    "id": "ocd-jurisdiction/country:us/state:oh/government",
+    "name": "Ohio"
+   },
+   "sources": [
+    {
+     "url": "https://www.legislature.ohio.gov/legislation/136/hb455",
+     "note": ""
+    }
+   ]
+  },
+  {
+   "identifier": "HB 647",
+   "title": "Regards publicly funded child care, the Child Care Cred Program",
+   "session": "136",
+   "latest_action_description": "Referred to committee",
+   "latest_action_date": "2026-09-30T04:00:00+00:00",
+   "openstates_url": "https://openstates.org/oh/bills/136/HB647/",
+   "jurisdiction": {
+    "id": "ocd-jurisdiction/country:us/state:oh/government",
+    "name": "Ohio"
+   },
+   "sources": [
+    {
+     "url": "https://www.legislature.ohio.gov/legislation/136/hb647",
+     "note": ""
+    }
+   ]
+  },
+  {
+   "identifier": "HB 239",
+   "title": "An Act relating to crime and criminal procedure; relating to civil claims by victims of sexual abuse of a minor; relating to homicide; relating to assault; relating to sexual assault; relating to stalking; relating to sexual abuse of a minor; relating to enticement and unlawful exploitation of a minor; relating to cruelty to animals; relating to endangering the welfare of a child; relating to indecent exposure; relating to theft; relating to generated obscene child sexual abuse material; relating to sending an explicit image of a minor; relating to solicitation or production of an indecent picture of a minor; relating to distribution of indecent material to minors; relating to prostitution; relating to the Controlled Substances Advisory Committee; relating to the testimony of children in criminal proceedings; relating to sentencing; relating to sexual assault examination kits; restricting the release of certain records of convictions; relating to teaching certificates; relating to the definition of 'victim counseling center' for disclosure of certain communications concerning sexual assault or domestic violence; relating to motor vehicle offenses; relating to the board of parole; relating to parole; relating to medical release for service of sentence by electronic monitoring; relating to licensing of school bus drivers; creating and relating to the address confidentiality program; and providing for an effective date.",
+   "session": "34",
+   "latest_action_description": "(H) FN22: (AJS)",
+   "latest_action_date": "2026-09-30",
+   "openstates_url": "https://openstates.org/ak/bills/34/HB239/",
+   "jurisdiction": {
+    "id": "ocd-jurisdiction/country:us/state:ak/government",
+    "name": "Alaska"
+   },
+   "sources": [
+    {
+     "url": "https://www.akleg.gov/basis/Bill/Detail/34?Root=HB239",
+     "note": ""
+    }
+   ]
+  },
+  {
+   "identifier": "HB 1611",
+   "title": "An Act amending the act of November 6, 1987 (P.L.381, No.79), known as the Older Adults Protective Services Act, extensively revising provisions relating to the protection of abused elderly; establishing a uniform Statewide reporting and investigative system for suspected abuse of the elderly; providing for protective services; prohibiting financial exploitation; providing for funding and for regulations; imposing penalties; and making editorial changes.",
+   "session": "2025-2026",
+   "latest_action_description": "Laid on the table",
+   "latest_action_date": "2026-09-08T04:00:00+00:00",
+   "openstates_url": "https://openstates.org/pa/bills/2025-2026/HB1611/",
+   "jurisdiction": {
+    "id": "ocd-jurisdiction/country:us/state:pa/government",
+    "name": "Pennsylvania"
+   },
+   "sources": [
+    {
+     "url": "https://www.palegis.us/legislation/bills/2025/hb1611",
+     "note": ""
+    }
+   ]
+  }
+ ],
+ "pagination": {
+  "per_page": 20,
+  "page": 1,
+  "max_page": 2,
+  "total_items": 785
+ }
+}

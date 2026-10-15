@@ -15,6 +15,7 @@ Schema (v1):
   "scope": "federal" | "federal + state" | "state:CA" | "compare:...",
   "fetched_at": "2026-04-22T09:15:00Z",
   "counts": { "signals": 12, "by_source_type": { "CONGRESS": 4, ... } },
+  "errors": [ { "source_tool": "state_legislation_search", "error": "..." } ],
   "signals": [
     {
       "id": "congress-...-slug",
@@ -31,6 +32,8 @@ Schema (v1):
       "pending": true,                   # optional, whether the item is still active
       "congress": "118",                # optional, Congress only
       "jurisdiction": "federal" | "state:CA",  # optional
+      "official_url": "...",            # optional, legislature page (state bills)
+      "openstates_url": "...",          # optional, aggregator link (STATE_LEG only)
       "citations": 0                    # ACADEMIC only
     }
   ]
@@ -120,38 +123,22 @@ def _extract_regulations(url: str, snippet: str) -> dict[str, str]:
     return out
 
 
-def _extract_state_bill(title: str, snippet: str, url: str, *, url_pattern: str) -> dict[str, str]:
-    out: dict[str, str] = {}
-    m = re.search(url_pattern, url or "")
-    if m:
-        out["jurisdiction"] = f"state:{m.group(1)}"
-        out["identifier"] = m.group(2)
-    else:
-        out["jurisdiction"] = "state"
-        if identifier := _extract_title_identifier(title):
-            out["identifier"] = identifier
-    if status := _extract_field(snippet, "Latest"):
+def _extract_state_bill(finding: Finding) -> dict[str, str]:
+    """State adapters set `jurisdiction` ("state:XX"); the latest action text is the status."""
+    out: dict[str, str] = {"jurisdiction": finding.jurisdiction or "state"}
+    if identifier := _extract_title_identifier(finding.title):
+        out["identifier"] = identifier
+    if status := _extract_field(finding.snippet, "Latest"):
         out["status"] = status
     return out
 
-
-def _extract_state_leg(title: str, snippet: str, url: str) -> dict[str, str]:
-    """OpenStates URLs: /{ST}/bills/{session}/{bill-id}/."""
-    return _extract_state_bill(title, snippet, url, url_pattern=r"/([A-Z]{2})/bills?/[^/]+/([^/?#]+)")
-
-
-def _extract_legiscan(title: str, snippet: str, url: str) -> dict[str, str]:
-    return _extract_state_bill(title, snippet, url, url_pattern=r"legiscan\.com/([A-Z]{2})/bill/([^/?#]+)")
-
-
-from collections.abc import Callable
 
 EXTRACTORS: dict[str, Callable[[Finding], dict[str, str]]] = {
     "CONGRESS": lambda f: _extract_congress(f.title, f.snippet),
     "FED_REGISTER": lambda f: _extract_fed_register(f.url, f.snippet),
     "REGULATIONS": lambda f: _extract_regulations(f.url, f.snippet),
-    "STATE_LEG": lambda f: _extract_state_leg(f.title, f.snippet, f.url),
-    "LEGISCAN": lambda f: _extract_legiscan(f.title, f.snippet, f.url),
+    "STATE_LEG": _extract_state_bill,
+    "LEGISCAN": _extract_state_bill,
 }
 
 
@@ -171,7 +158,23 @@ def _classify_bill_status(status: str) -> tuple[str, bool] | tuple[None, None]:
     text = status.lower()
     if not text:
         return None, None
-    if any(term in text for term in ("became law", "signed by", "chaptered", "enacted")):
+    if "veto" in text:
+        return "bill_vetoed", False
+    if re.match(r"^act\s+\d", text) or any(
+        term in text
+        for term in (
+            "became law",
+            "became public law",
+            "signed by",
+            "approved by the governor",
+            "approved by governor",
+            "chaptered",
+            "chapter no",
+            "enacted",
+            "effective",
+            "public act",
+        )
+    ):
         return "bill_enacted", False
     if any(term in text for term in ("introduced", "filed", "prefiled")):
         return "bill_introduced", True
@@ -245,6 +248,10 @@ def signal_from_finding(finding: Finding) -> dict[str, object]:
         signal["signal_kind"] = signal_kind
     if pending is not None:
         signal["pending"] = pending
+    if finding.official_url:
+        signal["official_url"] = finding.official_url
+    if finding.source_type == "STATE_LEG" and finding.url:
+        signal["openstates_url"] = finding.url
     for key in ("identifier", "status", "congress", "jurisdiction"):
         val = extracted.get(key)
         if val:
@@ -282,6 +289,7 @@ def emit_signals(
             "signals": len(signals),
             "by_source_type": _counts_by_source(signals),
         },
+        "errors": list(results.errors),
         "signals": signals,
     }
     return json.dumps(envelope, indent=2, ensure_ascii=False)

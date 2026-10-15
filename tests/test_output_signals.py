@@ -5,6 +5,8 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
+
 SRC = Path(__file__).resolve().parents[1] / "src"
 sys.path.insert(0, str(SRC))
 
@@ -70,6 +72,8 @@ def test_state_leg_extractor_infers_state():
         url="https://openstates.org/CA/bills/20232024/SB525/",
         date="2023-09-12",
         source_type="STATE_LEG",
+        jurisdiction="state:CA",
+        official_url="https://leginfo.legislature.ca.gov/sb525",
     )
     sig = module.signal_from_finding(f)
     assert sig["jurisdiction"] == "state:CA"
@@ -77,6 +81,36 @@ def test_state_leg_extractor_infers_state():
     assert sig["status"] == "Passed Assembly"
     assert sig["signal_kind"] == "bill_advanced"
     assert sig["pending"] is True
+    assert sig["official_url"] == "https://leginfo.legislature.ca.gov/sb525"
+    assert sig["openstates_url"] == "https://openstates.org/CA/bills/20232024/SB525/"
+
+
+@pytest.mark.parametrize(
+    ("latest", "kind", "pending"),
+    [
+        ("Effective 10/9/26", "bill_enacted", False),
+        ("Signed by the Governor, Chapter 179 of the Acts of 2026", "bill_enacted", False),
+        ("Act 198, 07/07/2026 (Gov. Msg. No. 1300).", "bill_enacted", False),
+        ("Public Act . . . . . . . . . 104-0612", "bill_enacted", False),
+        ("Chapter No. 2026-165", "bill_enacted", False),
+        ("06/23/2026 Signed by Governor", "bill_enacted", False),
+        ("Vetoed by the Governor", "bill_vetoed", False),
+        ("Referred to committee", "bill_referred", True),
+        ("Laid on the table", "bill_update", True),
+    ],
+)
+def test_state_status_comes_from_latest_action(latest, kind, pending):
+    f = Finding(
+        title="HB 1: T",
+        snippet=f"State: Ohio | Session: 136 | Latest: {latest}",
+        url="https://openstates.org/oh/bills/136/HB1/",
+        date="2026-10-09",
+        source_type="STATE_LEG",
+        jurisdiction="state:OH",
+    )
+    sig = module.signal_from_finding(f)
+    assert sig["signal_kind"] == kind
+    assert sig["pending"] is pending
 
 
 def test_legiscan_extractor_infers_state():
@@ -86,6 +120,7 @@ def test_legiscan_extractor_infers_state():
         url="https://legiscan.com/CA/bill/AB2324/2025",
         date="2026-04-21",
         source_type="LEGISCAN",
+        jurisdiction="state:CA",
     )
     sig = module.signal_from_finding(f)
     assert sig["jurisdiction"] == "state:CA"
@@ -168,3 +203,16 @@ def test_academic_preserves_citations():
     assert sig["citations"] == 42
     assert "identifier" not in sig
     assert "jurisdiction" not in sig
+
+
+def test_emit_signals_includes_adapter_errors():
+    results = ResearchResults()
+    results.errors.append({"source_tool": "state_legislation_search", "error": "OpenStates API error (400): Bad Request"})
+    envelope = json.loads(module.emit_signals("t", None, "policy", results))
+    assert envelope["errors"] == results.errors
+    assert envelope["signals"] == []
+
+
+def test_emit_signals_errors_empty_by_default():
+    envelope = json.loads(module.emit_signals("t", None, "policy", ResearchResults()))
+    assert envelope["errors"] == []
