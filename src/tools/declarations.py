@@ -51,7 +51,7 @@ TOOL_SPECS = {
 
 TOOL_ENV_VARS = {
     "web_search": "EXA_API_KEY",
-    "congress_search": "CONGRESS_GOV_API_KEY",
+    "congress_search": "GOVINFO_API_KEY",
     "regulations_search": "REGULATIONS_GOV_API_KEY",
     "state_legislation_search": "OPENSTATES_API_KEY",
 }

@@ -3,7 +3,7 @@ from collections.abc import Mapping
 from scopes import Scope
 
 from .declarations import get_available_tool_names
-from .models import Finding
+from .models import Finding, ToolResult
 from .implementations import (
     AcademicSearch,
     CensusSearch,
@@ -36,13 +36,19 @@ class ToolRegistry:
             if name in get_available_tool_names(scope)
         }
 
-    def execute(self, tool_name: str, args: Mapping[str, object]) -> tuple[list[Finding], str]:
-        """Return (findings, formatted_str) where formatted_str is the markdown text for Gemini."""
+    def run(self, tool_name: str, args: Mapping[str, object]) -> ToolResult:
+        """Run one adapter and return its findings and errors unchanged."""
         tool = self._tools.get(tool_name)
         if not tool:
+            return ToolResult(errors=[f"Unknown tool: {tool_name}"])
+        return tool.execute(**args)
+
+    def execute(self, tool_name: str, args: Mapping[str, object]) -> tuple[list[Finding], str]:
+        """Return (findings, formatted_str) where formatted_str is the markdown text for Gemini."""
+        if tool_name not in self._tools:
             return [], f"Unknown tool: {tool_name}"
 
-        result = tool.execute(**args)
+        result = self.run(tool_name, args)
 
         errors = [f"Tool error: {message}" for message in result.errors]
         findings = result.findings

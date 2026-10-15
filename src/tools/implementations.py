@@ -1,11 +1,15 @@
 import os
+import re
 
 import httpx
 from exa_py import Exa
 
 from . import base as _base
-from .base import BaseTool
+from .base import BaseTool, JsonValue
 from .models import Finding, ToolResult
+
+OPENSTATES_PAGE_SIZE = 20  # API rejects per_page > 20 with HTTP 400
+OPENSTATES_MAX_PAGES = 5
 
 STATE_FIPS = {
     "AL": "01",
@@ -182,50 +186,120 @@ class AcademicSearch(BaseTool):
         return self._ok(findings)
 
 
+_BILL_PATH = {
+    "hr": "house-bill",
+    "s": "senate-bill",
+    "hjres": "house-joint-resolution",
+    "sjres": "senate-joint-resolution",
+    "hconres": "house-concurrent-resolution",
+    "sconres": "senate-concurrent-resolution",
+    "hres": "house-resolution",
+    "sres": "senate-resolution",
+}
+_BILL_VERSION = {
+    "ih": "Introduced in House",
+    "is": "Introduced in Senate",
+    "rh": "Reported in House",
+    "rs": "Reported in Senate",
+    "rfh": "Referred in House",
+    "rfs": "Referred in Senate",
+    "eh": "Engrossed in House",
+    "es": "Engrossed in Senate",
+    "eah": "Engrossed amendment House",
+    "eas": "Engrossed amendment Senate",
+    "pcs": "Placed on calendar Senate",
+    "pch": "Placed on calendar House",
+    "enr": "Enrolled bill",
+}
+_PACKAGE_ID = re.compile(r"^BILLS-(\d+)(hr|s|hjres|sjres|hconres|sconres|hres|sres)(\d+)([a-z]+)$")
+
+
+def _ordinal(value: str) -> str:
+    n = int(value)
+    suffix = "th" if 10 <= n % 100 <= 20 else {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
+    return f"{n}{suffix}"
+
+
 class CongressSearch(BaseTool):
+    """Federal bill text search via the GovInfo search API.
+
+    The Congress.gov bill endpoint ignores its query parameter, so it cannot filter by topic.
+    """
+
     SOURCE_TYPE = "CONGRESS"
-    BASE_URL = "https://api.congress.gov/v3"
+    SEARCH_URL = "https://api.govinfo.gov/search"
+
+    def _search(self, body: dict[str, object], api_key: str) -> JsonValue:
+        key = _base._cache_key(self.SEARCH_URL, body)
+        cached = _base._read_cached_json(key)
+        if cached is not None:
+            return cached
+        if self._http_client is None:
+            self._http_client = httpx.Client(timeout=_base.TIMEOUT)
+        response = self._http_client.post(
+            self.SEARCH_URL, json=body, headers={"X-Api-Key": api_key}
+        )
+        response.raise_for_status()
+        data = response.json()
+        _base._write_cached_json(key, data)
+        return data
 
     def execute(self, query: str = "", **kwargs) -> ToolResult:
-        api_key = os.getenv("CONGRESS_GOV_API_KEY")
+        api_key = os.getenv("GOVINFO_API_KEY")
         if not api_key:
-            return self._missing_api_key("CONGRESS_GOV_API_KEY")
-        if not query:
+            return self._missing_api_key("GOVINFO_API_KEY")
+        terms = [t for t in query.replace('"', " ").split() if t]
+        if not terms:
             return self._error("No query provided")
         since: str | None = kwargs.get("since")
-        params: dict[str, object] = {"query": query, "limit": _base.RESULTS_LIMIT, "api_key": api_key}
+        clauses = ["collection:BILLS", *terms]
         if since:
-            params["fromDateTime"] = f"{since}T00:00:00Z"
+            clauses.insert(1, f"publishdate:range({since},)")
+        body: dict[str, object] = {
+            "query": " AND ".join(clauses),
+            "pageSize": min(100, _base.RESULTS_LIMIT * 3),
+            "offsetMark": "*",
+        }
         try:
-            data = self._fetch_json(f"{self.BASE_URL}/bill", params=params)
+            data = self._search(body, api_key)
         except httpx.HTTPError as error:
-            return self._http_error("Congress.gov", error)
+            return self._http_error("GovInfo", error)
 
         if not isinstance(data, dict):
-            return self._parse_error("Congress", TypeError("response was not an object"))
+            return self._parse_error("GovInfo", TypeError("response was not an object"))
 
-        findings = []
-        for bill in _as_mapping_list(data.get("bills"))[:_base.RESULTS_LIMIT]:
-            latest_action = _as_mapping(bill.get("latestAction"))
-            date = _as_string(latest_action.get("actionDate")) or _as_string(
-                bill.get("introducedDate")
-            )
-            if since and date and date[:10] < since:
+        # One finding per bill: keep the newest text version.
+        latest: dict[tuple[str, str, str], tuple[str, str, str]] = {}
+        for row in _as_mapping_list(data.get("results")):
+            match = _PACKAGE_ID.match(_as_string(row.get("packageId")))
+            if not match:
                 continue
-            bill_id = f"{_as_string(bill.get('type'))}{_as_string(bill.get('number'))}"
-            findings.append(
-                Finding(
-                    title=f"{bill_id}: {_as_string(bill.get('title'), 'No title')}",
-                    snippet=(
-                        f"Congress {_stringify(bill.get('congress'), 'N/A')} | "
-                        f"Status: {_as_string(latest_action.get('text'), 'N/A')}"
-                    ),
-                    url=_as_string(bill.get("url")),
-                    date=date,
-                    source_type=self.SOURCE_TYPE,
-                )
+            congress, bill_type, number, version = match.groups()
+            date = _as_string(row.get("dateIssued"))[:10]
+            if since and date and date < since:
+                continue
+            key = (congress, bill_type, number)
+            if key not in latest or date > latest[key][0]:
+                latest[key] = (date, version, _as_string(row.get("title"), "No title"))
+
+        findings = [
+            Finding(
+                title=f"{bill_type.upper()}{number}: {title}",
+                snippet=(
+                    f"Congress {congress} | "
+                    f"Status: {_BILL_VERSION.get(version, f'Text version {version}')}"
+                ),
+                url=(
+                    f"https://www.congress.gov/bill/{_ordinal(congress)}-congress/"
+                    f"{_BILL_PATH[bill_type]}/{number}"
+                ),
+                date=date,
+                source_type=self.SOURCE_TYPE,
             )
-        return self._ok(findings)
+            for (congress, bill_type, number), (date, version, title) in latest.items()
+        ]
+        findings.sort(key=lambda f: f.date, reverse=True)
+        return self._ok(findings[: _base.RESULTS_LIMIT])
 
 
 class FederalRegisterSearch(BaseTool):
@@ -493,7 +567,9 @@ class StateLegislationSearch(BaseTool):
 
         openstates_result: ToolResult | None = None
         if openstates_api_key:
-            openstates_result = self._openstates_search(query, jurisdiction, openstates_api_key)
+            openstates_result = self._openstates_search(
+                query, jurisdiction, openstates_api_key, kwargs.get("since")
+            )
             if openstates_result.findings:
                 return openstates_result
             if not legiscan_api_key or not state_code:
@@ -508,6 +584,8 @@ class StateLegislationSearch(BaseTool):
 
         legiscan_result = self._legiscan_search(query, state_code, legiscan_api_key)
         if legiscan_result.findings or openstates_result is None:
+            if openstates_result is not None:
+                legiscan_result.errors = [*openstates_result.errors, *legiscan_result.errors]
             return legiscan_result
         if openstates_result.errors and legiscan_result.errors:
             return ToolResult(errors=[*openstates_result.errors, *legiscan_result.errors])
@@ -525,43 +603,65 @@ class StateLegislationSearch(BaseTool):
         query: str,
         jurisdiction: str | None,
         api_key: str,
+        since: str | None = None,
     ) -> ToolResult:
-        params: dict[str, object] = {"q": query, "per_page": _base.RESULTS_LIMIT}
+        params: dict[str, object] = {
+            "q": query,
+            "per_page": OPENSTATES_PAGE_SIZE,
+            "include": "sources",
+            "sort": "latest_action_desc",
+        }
         if jurisdiction:
             params["jurisdiction"] = jurisdiction
+        if since:
+            params["action_since"] = since
 
-        try:
-            data = self._fetch_json(
-                f"{self.BASE_URL}/bills",
-                params=params,
-                headers={"X-API-KEY": api_key},
-            )
-        except httpx.HTTPError as error:
-            return self._http_error("OpenStates", error)
-
-        if not isinstance(data, dict):
-            return self._parse_error("state legislation", TypeError("response was not an object"))
-
-        findings = []
-        for bill in _as_mapping_list(data.get("results"))[:_base.RESULTS_LIMIT]:
-            jurisdiction_info = _as_mapping(bill.get("jurisdiction"))
-            latest = _as_string(bill.get("latest_action_description"), "N/A")[:100]
-            findings.append(
-                Finding(
-                    title=(
-                        f"{_as_string(bill.get('identifier'), 'N/A')}: "
-                        f"{_as_string(bill.get('title'), 'No title')[:80]}"
-                    ),
-                    snippet=(
-                        f"State: {_as_string(jurisdiction_info.get('name'), 'N/A')} | "
-                        f"Session: {_stringify(bill.get('session'), 'N/A')} | Latest: {latest}"
-                    ),
-                    url=_as_string(bill.get("openstates_url")),
-                    date=_as_string(bill.get("latest_action_date")),
-                    source_type=self.SOURCE_TYPE,
+        pages = min(OPENSTATES_MAX_PAGES, -(-_base.RESULTS_LIMIT // OPENSTATES_PAGE_SIZE))
+        findings: list[Finding] = []
+        errors: list[str] = []
+        for page in range(1, pages + 1):
+            try:
+                data = self._fetch_json(
+                    f"{self.BASE_URL}/bills",
+                    params={**params, "page": page},
+                    headers={"X-API-KEY": api_key},
                 )
-            )
-        return self._ok(findings)
+            except httpx.HTTPError as error:
+                errors.extend(self._http_error(f"OpenStates (page {page})", error).errors)
+                break
+            if not isinstance(data, dict):
+                errors.extend(
+                    self._parse_error("state legislation", TypeError("response was not an object")).errors
+                )
+                break
+            findings.extend(self._openstates_finding(bill) for bill in _as_mapping_list(data.get("results")))
+            if page >= int(_as_mapping(data.get("pagination")).get("max_page") or 1):
+                break
+        return ToolResult(findings=findings[: _base.RESULTS_LIMIT], errors=errors)
+
+    def _openstates_finding(self, bill: dict[str, object]) -> Finding:
+        jurisdiction_info = _as_mapping(bill.get("jurisdiction"))
+        openstates_url = _as_string(bill.get("openstates_url"))
+        code_match = re.search(r"/state:([a-z]{2})/", _as_string(jurisdiction_info.get("id")))
+        if not code_match:
+            code_match = re.search(r"openstates\.org/([a-z]{2})/", openstates_url)
+        sources = _as_mapping_list(bill.get("sources"))
+        latest = _as_string(bill.get("latest_action_description"), "N/A")[:100]
+        return Finding(
+            title=(
+                f"{_as_string(bill.get('identifier'), 'N/A')}: "
+                f"{_as_string(bill.get('title'), 'No title')[:80]}"
+            ),
+            snippet=(
+                f"State: {_as_string(jurisdiction_info.get('name'), 'N/A')} | "
+                f"Session: {_stringify(bill.get('session'), 'N/A')} | Latest: {latest}"
+            ),
+            url=openstates_url,
+            date=_as_string(bill.get("latest_action_date"))[:10],
+            source_type=self.SOURCE_TYPE,
+            jurisdiction=f"state:{code_match.group(1).upper()}" if code_match else "",
+            official_url=_as_string(sources[0].get("url")) if sources else "",
+        )
 
     def _legiscan_search(self, query: str, state_code: str, api_key: str) -> ToolResult:
         try:
@@ -602,6 +702,8 @@ class StateLegislationSearch(BaseTool):
                     url=_as_string(bill.get("url")),
                     date=_as_string(bill.get("last_action_date")),
                     source_type="LEGISCAN",
+                    jurisdiction=f"state:{state_code}",
+                    official_url=_as_string(bill.get("state_link")),
                 )
             )
         return self._ok(findings)

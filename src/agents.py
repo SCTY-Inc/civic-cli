@@ -207,13 +207,14 @@ def direct_research(
     def execute(tool_name: str):
         if verbose:
             console.print(f"  [dim]{tool_name}: {topic}[/]")
-        findings, _formatted = registry.execute(tool_name, arguments(tool_name))
-        return tool_name, findings
+        return tool_name, registry.run(tool_name, arguments(tool_name))
 
     with ThreadPoolExecutor(max_workers=max(1, len(tool_names))) as pool:
-        for tool_name, findings in pool.map(execute, tool_names):
-            for finding in findings:
+        for tool_name, result in pool.map(execute, tool_names):
+            for finding in result.findings:
                 results.add(finding, tool_name)
+            for message in result.errors:
+                results.errors.append({"source_tool": tool_name, "error": message})
 
     return ResearchOutput(text="", results=results, scope_label=scope_label(scope))
 

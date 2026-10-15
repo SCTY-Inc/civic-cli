@@ -128,11 +128,11 @@ Census is still capped to up to 5 rows by the adapter.
 | web_search | Exa | `EXA_API_KEY` required when scope includes web search | RESULTS_LIMIT |
 | academic_search | Semantic Scholar | None | RESULTS_LIMIT |
 | census_search | US Census | `CENSUS_API_KEY` optional (better limits) | up to 5 |
-| congress_search | Congress.gov | `CONGRESS_GOV_API_KEY` optional; enables source | RESULTS_LIMIT |
+| congress_search | GovInfo bill-text search (Congress.gov URLs) | `GOVINFO_API_KEY` optional; enables source | RESULTS_LIMIT |
 | federal_register_search | Federal Register | None | RESULTS_LIMIT |
 | regulations_search | Regulations.gov | `REGULATIONS_GOV_API_KEY` optional; enables source | RESULTS_LIMIT |
 | court_search | CourtListener | None | RESULTS_LIMIT |
-| state_legislation_search | OpenStates + LegiScan fallback | `OPENSTATES_API_KEY` optional; `LEGISCAN_API_KEY` enables single-state fallback | RESULTS_LIMIT |
+| state_legislation_search | OpenStates (20 per page, up to 5 pages, `action_since`) + LegiScan fallback | `OPENSTATES_API_KEY` optional; `LEGISCAN_API_KEY` enables single-state fallback | RESULTS_LIMIT |
 
 ## Infrastructure
 
@@ -163,7 +163,7 @@ uv run civic get <url> -f json                 # fetch arbitrary URL as JSON env
 ```
 
 `civic -f json` returns structured JSON with findings, confidence, and tool usage.
-`civic signals ...` returns a stable signals envelope (`schema_version = 1`) for downstream ingestion.
+`civic signals ...` returns a stable signals envelope (`schema_version = 1`) for downstream ingestion. With `--direct` the envelope carries `errors[]` (`source_tool`, `error`) from every adapter. State bill signals carry `jurisdiction` (`state:XX`), `official_url` (legislature page), and `openstates_url`.
 Bill-like signals now carry movement metadata (`status`, `signal_kind`, `pending`) and use movement-aware IDs so later actions on the same bill can surface as distinct signals.
 Exit code 0 on success, 1 on error, 130 on interrupt.
 Rich formatting auto-disables when stdout is not a TTY or when `NO_COLOR` is set.

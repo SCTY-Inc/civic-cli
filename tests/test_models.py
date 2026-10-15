@@ -16,6 +16,7 @@ class TestFinding:
         assert d == {
             "title": "T", "snippet": "S", "url": "U",
             "date": "2025", "source_type": "WEB", "citations": 5,
+            "jurisdiction": "", "official_url": "",
         }
 
 

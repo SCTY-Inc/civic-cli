@@ -1,0 +1,82 @@
+{
+ "results": [
+  {
+   "identifier": "SB 906",
+   "title": "An Act establishing the Pennsylvania Family and Medical Leave Program and the Family and Medical Leave Fund; conferring powers and imposing duties on the Department of Labor and Industry; creating a right of action; and imposing penalties.",
+   "session": "2025-2026",
+   "latest_action_description": "Re-referred to Rules & Executive Nominations",
+   "latest_action_date": "2026-06-22T04:00:00+00:00",
+   "openstates_url": "https://openstates.org/pa/bills/2025-2026/SB906/",
+   "jurisdiction": {
+    "id": "ocd-jurisdiction/country:us/state:pa/government",
+    "name": "Pennsylvania"
+   },
+   "sources": [
+    {
+     "url": "https://www.palegis.us/legislation/bills/2025/sb906",
+     "note": ""
+    }
+   ]
+  },
+  {
+   "identifier": "SB 1662",
+   "title": "probation supervision; least restrictive conditions",
+   "session": "57th-2nd-regular",
+   "latest_action_description": "Signed by Governor",
+   "latest_action_date": "2026-06-19",
+   "openstates_url": "https://openstates.org/az/bills/57th-2nd-regular/SB1662/",
+   "jurisdiction": {
+    "id": "ocd-jurisdiction/country:us/state:az/government",
+    "name": "Arizona"
+   },
+   "sources": [
+    {
+     "url": "https://apps.azleg.gov/BillStatus/BillOverview/85302?SessionId=130",
+     "note": ""
+    }
+   ]
+  },
+  {
+   "identifier": "SB 2882",
+   "title": "AN ACT RELATING TO BEHAVIORAL HEALTHCARE, DEVELOPMENTAL DISABILITIES AND HOSPITALS -- QUALITY SELF-DIRECTED SUPPORTS ACT OF 2026",
+   "session": "2026",
+   "latest_action_description": "06/18/2026 Signed by Governor",
+   "latest_action_date": "2026-06-18",
+   "openstates_url": "https://openstates.org/ri/bills/2026/SB2882/",
+   "jurisdiction": {
+    "id": "ocd-jurisdiction/country:us/state:ri/government",
+    "name": "Rhode Island"
+   },
+   "sources": [
+    {
+     "url": "https://status.rilegislature.gov/",
+     "note": ""
+    }
+   ]
+  },
+  {
+   "identifier": "HB 7361",
+   "title": "AN ACT RELATING TO BEHAVIORAL HEALTHCARE, DEVELOPMENTAL DISABILITIES AND HOSPITALS -- QUALITY SELF-DIRECTED SUPPORTS ACT OF 2026",
+   "session": "2026",
+   "latest_action_description": "06/18/2026 Signed by Governor",
+   "latest_action_date": "2026-06-18",
+   "openstates_url": "https://openstates.org/ri/bills/2026/HB7361/",
+   "jurisdiction": {
+    "id": "ocd-jurisdiction/country:us/state:ri/government",
+    "name": "Rhode Island"
+   },
+   "sources": [
+    {
+     "url": "https://status.rilegislature.gov/",
+     "note": ""
+    }
+   ]
+  }
+ ],
+ "pagination": {
+  "per_page": 20,
+  "page": 2,
+  "max_page": 2,
+  "total_items": 785
+ }
+}

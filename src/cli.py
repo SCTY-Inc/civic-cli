@@ -44,7 +44,7 @@ err_console = Console(stderr=True, no_color=_NO_COLOR, force_terminal=_FORCE_TER
 API_KEY_SIGNUP = {
     "GOOGLE_API_KEY": "https://aistudio.google.com/apikey",
     "EXA_API_KEY": "https://dashboard.exa.ai/api-keys",
-    "CONGRESS_GOV_API_KEY": "https://api.congress.gov/sign-up",
+    "GOVINFO_API_KEY": "https://api.data.gov/signup/",
     "OPENSTATES_API_KEY": "https://openstates.org/accounts/register/",
     "LEGISCAN_API_KEY": "https://legiscan.com/legiscan",
     "REGULATIONS_GOV_API_KEY": "https://open.gsa.gov/api/regulationsgov/",
@@ -462,7 +462,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     """Validate env vars. Required keys fail the run; optional keys warn only."""
     required_keys = ["GOOGLE_API_KEY", "EXA_API_KEY"]
     optional_keys = [
-        "CONGRESS_GOV_API_KEY",
+        "GOVINFO_API_KEY",
         "OPENSTATES_API_KEY",
         "LEGISCAN_API_KEY",
         "REGULATIONS_GOV_API_KEY",
