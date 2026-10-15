@@ -15,14 +15,12 @@ build/
 # uv
 uv.lock
 
-# Output
+# Docs: only tracked pages
 *.md
 !README.md
 !CLAUDE.md
 !AGENTS.md
-report/
-output/
-outputs/
+!SOURCES.md
 
 # IDE / local agent state
 .idea/

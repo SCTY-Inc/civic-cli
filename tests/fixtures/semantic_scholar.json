@@ -1,0 +1,22 @@
+{
+  "total": 1,
+  "data": [
+    {
+      "paperId": "abc",
+      "title": "Paid Family Caregiving and Health",
+      "abstract": null,
+      "year": 2025,
+      "publicationDate": "2025-02-10",
+      "citationCount": 4,
+      "url": "https://www.semanticscholar.org/paper/abc",
+      "authors": [
+        {
+          "name": "A. Author"
+        }
+      ],
+      "externalIds": {
+        "DOI": "10.1000/xyz"
+      }
+    }
+  ]
+}

@@ -1,195 +1,37 @@
 # civic-cli-tools
 
-Policy-source adapters and an optional brief-writing CLI for eight government,
-web, and academic sources.
-
-```text
-civic signals --direct → source adapters → normalized signals JSON
-civic <topic>           → Gemini research → write/review → brief or JSON
-```
-
-Automation should prefer `signals --direct`: it performs one bounded fan-out
-across the source adapters without model orchestration or repository writes.
-Workflow owners such as Hound supply planning, approvals, and durable state.
+One search across official and open policy sources: Congress bills (GovInfo),
+Federal Register, Regulations.gov, CourtListener, Open States, LegiScan,
+Census, Semantic Scholar, and Exa web search. Every record says where it came
+from: adapter, endpoint, parameters, HTTP status, time, terms, and a content
+hash.
 
 ## Install
 
 ```bash
-uv tool install git+https://github.com/SCTY-Inc/civic-cli  # installs the `civic` command
+uv tool install git+https://github.com/SCTY-Inc/civic-cli
+cp .env.example .env   # all keys optional; see SOURCES.md
+civic doctor           # which sources can run
 ```
 
-For development:
+## Use
 
 ```bash
-uv sync
-cp .env.example .env  # add API keys
+civic search "paid family caregiver" --scope policy --since 2025-01-01
+civic search "caregiver tax credit" --scope state:CA,NY --format jsonl
+civic search "respite care" --sources federal_register,courtlistener --raw-dir ./raw
 ```
 
-## API Keys
+Scopes: `all` (default), `federal`, `policy`, `news`, `state:XX,YY`.
 
-| Key | When Needed | Get It | Cost |
-|-----|-------------|--------|------|
-| GOOGLE_API_KEY | Brief/research mode only; not used by `signals --direct` | [aistudio.google.com/apikey](https://aistudio.google.com/apikey) | Free |
-| EXA_API_KEY | When scope includes web search (`all`, `federal`, `state:XX`, `news`) | [dashboard.exa.ai/api-keys](https://dashboard.exa.ai/api-keys) | Free tier |
-| GOVINFO_API_KEY | Optional — unlocks federal bill search (GovInfo; links to congress.gov) | [api.data.gov/signup](https://api.data.gov/signup/) | Free |
-| OPENSTATES_API_KEY | Optional — unlocks OpenStates source | [openstates.org/accounts/register](https://openstates.org/accounts/register/) | Free |
-| LEGISCAN_API_KEY | Optional — situational fallback for single-state legislation searches | LegiScan account | Free public tier |
-| REGULATIONS_GOV_API_KEY | Optional — unlocks Regulations.gov source | [open.gsa.gov/api/regulationsgov/](https://open.gsa.gov/api/regulationsgov/) | Free |
-| CENSUS_API_KEY | Optional — improves Census rate limits | [api.census.gov/data/key_signup](https://api.census.gov/data/key_signup.html) | Free |
-
-No key needed: Semantic Scholar, Federal Register, CourtListener.
-
-## Usage
-
-```bash
-civic "Solar energy policy"                    # all sources (default scope)
-civic "AI regulation" -s federal               # federal only
-civic "Rent control" -s state:CA,NY            # specific states
-civic "Housing" -q "Impact of zoning reform?"  # with questions
-civic "Climate policy" -v                      # verbose
-civic "Healthcare" --sources                   # show confidence + source audit
-civic "AI regulation" --limit 10               # cap per-tool results (default 25)
-echo "Paid leave" | civic -                    # read topic from stdin
+```python
+from civic import search
+envelope = search("paid family caregiver", scope="policy", since="2025-01-01")
 ```
 
-### Environment Check
-
-```bash
-civic doctor                                   # validate required + optional API keys
-```
-
-Brief/research mode requires `GOOGLE_API_KEY`. Direct signals mode does not.
-`EXA_API_KEY` is required when the selected scope includes web search. Optional
-source keys unlock or improve Congress.gov, OpenStates/LegiScan,
-Regulations.gov, and Census without blocking keyless sources.
-
-### Fetch URL
-
-```bash
-civic get https://example.com/bill.pdf         # raw body to stdout
-civic get https://example.com -f json          # JSON envelope (status, headers, content)
-```
-
-### Signals output
-
-```bash
-civic signals --direct --topic "family caregiver policy" -s federal --limit 2
-civic signals pulse-policy-weekly # model-selected legacy/preset mode
-```
-
-`--direct` runs every available adapter for the selected scope once, in
-parallel, and emits the stable atomic signals envelope. It does not call Gemini,
-write a report, or review results. This is the supported integration primitive
-for Hound and other workflow owners.
-
-Without `--direct`, signals mode retains the model-selected research loop for
-interactive use. Direct mode accepts one preset or `--topic`, plus `--scope`,
-`--limit`, `--since`, and `--verbose`; compare mode remains model-owned.
-
-Bill-like signals include movement metadata when available:
-- `status` — latest bill/rule action text
-- `signal_kind` — normalized movement such as `bill_referred`, `bill_advanced`, `proposed_rule`
-- `pending` — whether the item still represents an active/pending policy movement
-- movement-aware `id` values — later bill actions can surface as distinct signals instead of collapsing to one URL
-
-### JSON Output (for agents)
-
-```bash
-civic "AI regulation" -s federal -f json       # structured JSON to stdout
-civic "Caregiver policy" -f json | jq '.findings | length'
-```
-
-JSON schema:
-```json
-{
-  "topic": "...",
-  "scope": "...",
-  "timestamp": "ISO8601",
-  "confidence": { "level": "HIGH", "detail": "..." },
-  "findings": [{ "title", "snippet", "url", "date", "source_type", "citations" }],
-  "tool_usage": { "congress_search": 10, ... }
-}
-```
-
-### Compare Mode
-
-```bash
-civic "Paid leave" --compare CA,NY             # state vs state
-civic "Healthcare" --compare federal,CA        # federal vs state
-civic "Immigration" --compare policy,news      # legislation vs media
-civic "Cannabis" --compare CA,CO,NY            # multi-state
-```
-
-### Topic Presets
-
-```bash
-civic topics                                   # list presets
-civic run caregiver-federal                    # run named preset
-civic run ai-regulation-federal -f json        # preset with JSON output
-```
-
-## Options
-
-```
--s, --scope SCOPE      federal | state:XX | all | news | policy (default: all)
--c, --compare A,B      compare targets: CA,NY or federal,CA or policy,news
--f, --format FMT       markdown (file) | json (stdout)
--o, --output FILE      default: outputs/report.md
--q, --questions Q      research questions
--v, --verbose          show tool calls
---sources              show confidence score + source usage
---no-appendix          exclude source appendix from output
---no-review            skip the reviewer pass (faster; lower polish)
---since YYYY-MM-DD     filter results to items published on/after date
---limit N              per-tool results cap (default: 25)
--V, --version
-```
-
-Pass `-` as the topic to read it from stdin. Rich output respects `NO_COLOR` and auto-disables when stdout is not a TTY.
-
-Subcommands:
-- `civic run <preset>`      run a named preset from `topics.toml`
-- `civic signals <preset>`  emit atomic per-finding JSON for web-pulse / agents
-- `civic topics`            list packaged or local presets
-- `civic doctor`            env/API-key preflight
-- `civic get <url>`         fetch raw body or JSON envelope
-- `civic cache stats|clear` inspect or clear the SQLite cache
-
-### Cache Management
-
-```bash
-civic cache stats                              # show cache size + entries
-civic cache clear                              # purge all cached responses
-```
-
-## Output
-
-- Confidence level (HIGH/MEDIUM/LOW) from source diversity, recency, citations
-- Source appendix with dates and URLs
-- Atomic signals JSON (`civic signals`), with bill/rule movement metadata (`status`, `signal_kind`, `pending`)
-- Responses cached 24h in SQLite at `~/.cache/civic/`; keys are stripped from the cache key
-
-## Tools
-
-| Tool | Source | Data |
-|------|--------|------|
-| web_search | Exa | news, articles |
-| academic_search | Semantic Scholar | papers |
-| census_search | US Census | demographics, income, housing |
-| congress_search | Congress.gov | federal bills |
-| federal_register_search | Federal Register | rules, notices |
-| regulations_search | Regulations.gov | dockets, comments, rulemaking |
-| court_search | CourtListener | federal case law |
-| state_legislation_search | OpenStates + LegiScan fallback | 50 state bills |
-
-## Configuration
-
-| Env Var | Default | Purpose |
-|---------|---------|---------|
-| CIVIC_MODEL | gemini-3.1-flash-lite-preview | Gemini model for all phases |
-| CIVIC_MAX_ITERATIONS | 15 | Max tool calls per research phase |
-| CIVIC_MAX_RETRIES | 4 | Gemini retries on 429 |
+Output schema, adapters, and rules: [AGENTS.md](AGENTS.md).
+Credits, terms, and rate limits: [SOURCES.md](SOURCES.md).
 
 ## License
 
-MIT
+MIT. Source data stays under each provider's terms.

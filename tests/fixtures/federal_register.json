@@ -1,0 +1,27 @@
+{
+  "count": 2,
+  "results": [
+    {
+      "title": "Medicare Program; Caregiver Training Services",
+      "type": "Proposed Rule",
+      "abstract": "CMS proposes payment for caregiver training.",
+      "document_number": "2025-01234",
+      "html_url": "https://www.federalregister.gov/documents/2025/07/14/2025-01234/medicare-program",
+      "publication_date": "2025-07-14",
+      "agencies": [
+        {
+          "name": "Centers for Medicare & Medicaid Services"
+        }
+      ]
+    },
+    {
+      "title": "Family Caregiver Support Program",
+      "type": "Notice",
+      "abstract": null,
+      "document_number": "2025-05678",
+      "html_url": "https://www.federalregister.gov/documents/2025/03/02/2025-05678/family-caregiver",
+      "publication_date": "2025-03-02",
+      "agencies": []
+    }
+  ]
+}

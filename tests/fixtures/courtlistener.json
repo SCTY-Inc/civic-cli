@@ -1,0 +1,17 @@
+{
+  "count": 1,
+  "results": [
+    {
+      "caseName": "Doe v. State Department of Aging",
+      "absolute_url": "/opinion/123/doe-v-state/",
+      "dateFiled": "2025-05-01",
+      "court": "Ninth Circuit",
+      "docketNumber": "24-1234",
+      "opinions": [
+        {
+          "snippet": "a <mark>family caregiver</mark> may claim"
+        }
+      ]
+    }
+  ]
+}

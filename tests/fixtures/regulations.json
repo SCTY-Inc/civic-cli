@@ -1,0 +1,16 @@
+{
+  "data": [
+    {
+      "id": "CMS-2025-0001-0001",
+      "type": "documents",
+      "attributes": {
+        "title": "Caregiver Training Rule",
+        "documentType": "Proposed Rule",
+        "agencyId": "CMS",
+        "docketId": "CMS-2025-0001",
+        "postedDate": "2025-07-14T04:00:00Z",
+        "frDocNum": "2025-01234"
+      }
+    }
+  ]
+}
