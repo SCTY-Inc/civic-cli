@@ -53,6 +53,8 @@ class Recorder:
         if host == "v3.openstates.org":
             page = request.url.params.get("page", "1")
             return httpx.Response(200, json=fixture(f"openstates_page{page}.json"))
+        if host == "api.legiscan.com" and request.url.params.get("op") == "getBill":
+            return httpx.Response(200, json=fixture("legiscan_bill.json"))
         return httpx.Response(200, json=fixture(HOST_FIXTURES[host]))
 
     def to(self, host: str) -> list[httpx.Request]:

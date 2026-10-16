@@ -90,12 +90,13 @@ def test_raw_dir_saves_responses_without_keys(tmp_path, transport):
     envelope = search("caregiver", sources=["legiscan", "census"], env=KEYS,
                       raw_dir=tmp_path, transport=transport(tmp_path / "run"))
     files = sorted((tmp_path / "run").iterdir())
-    assert len(files) == 2
+    assert len(files) == 4  # legiscan getSearch + 2 getBill, census
     saved = [json.loads(f.read_text()) for f in files]
     assert {s["call"]["source"] for s in saved} == {"legiscan", "census"}
     assert not any(secret in f.read_text() for f in files for secret in KEYS.values())
     raw_paths = {r.provenance["raw_path"] for r in envelope.records}
-    assert raw_paths == {str(f) for f in files}
+    assert raw_paths <= {str(f) for f in files}
+    assert len(raw_paths) == 2  # getSearch and census; getBill is traced in sources[].calls
 
 
 def test_raw_dir_is_namespaced_by_run_id(tmp_path, monkeypatch, recorder):

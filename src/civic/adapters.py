@@ -354,7 +354,7 @@ class OpenStates(Adapter):
 
 class LegiScan(Adapter):
     name = "legiscan"
-    service = "LegiScan API getSearch"
+    service = "LegiScan API getSearch, getBill"
     docs = "https://legiscan.com/legiscan"
     terms = "CC BY 4.0; credit LegiScan"
     env = "LEGISCAN_API_KEY"
@@ -366,15 +366,25 @@ class LegiScan(Adapter):
         errors: list[SourceError] = []
         for state in q.scope.states or ("ALL",):
             try:
-                records.extend(self._search_one(q, http, env, state))
+                records.extend(self._search_one(q, http, env, state, errors))
             except SourceError as error:
                 errors.append(error)
         if errors and not records:
             raise errors[0]
         return records, errors
 
+    def _state_link(self, http: Transport, env: Mapping[str, str], bill_id: object) -> str:
+        """getSearch omits the legislature URL; getBill carries it (one call per record)."""
+        params = {"key": self.key(env), "op": "getBill", "id": bill_id}
+        data, call = self._get(http, self.URL, params=params, secret_params=frozenset({"key"}))
+        _expect(data, dict, call)
+        status = _str(data.get("status"))
+        if status and status.upper() != "OK":
+            raise SourceError(f"LegiScan getBill status {status}", call)
+        return _str(_map(data.get("bill")).get("state_link"))
+
     def _search_one(self, q: Query, http: Transport, env: Mapping[str, str],
-                    state: str) -> list[Record]:
+                    state: str, errors: list[SourceError]) -> list[Record]:
         params = {"key": self.key(env), "op": "getSearch", "state": state, "query": q.topic}
         data, call = self._get(http, self.URL, params=params, secret_params=frozenset({"key"}))
         _expect(data, dict, call)
@@ -390,6 +400,12 @@ class LegiScan(Adapter):
             if q.since and date and date < q.since:
                 continue
             code = _str(bill.get("state")) or state
+            official = _str(bill.get("state_link"))
+            if not official and bill.get("bill_id"):
+                try:
+                    official = self._state_link(http, env, bill["bill_id"])
+                except SourceError as error:
+                    errors.append(error)
             records.append(self._trace(
                 Record(
                     source=self.name,
@@ -400,7 +416,7 @@ class LegiScan(Adapter):
                     jurisdiction=f"state:{code}" if code in STATE_FIPS else "",
                     identifier=_str(bill.get("bill_number")),
                     status=_str(bill.get("last_action")),
-                    official_url=_str(bill.get("state_link")),
+                    official_url=official,
                     details={"bill_id": bill.get("bill_id")} if bill.get("bill_id") else {},
                 ),
                 call,

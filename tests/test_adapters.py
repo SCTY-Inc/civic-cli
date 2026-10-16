@@ -159,6 +159,16 @@ class TestLegiScan:
         assert bill.jurisdiction == "state:CA"
         assert bill.official_url.startswith("https://leginfo.legislature.ca.gov/")
         assert bill.movement == ("bill_referred", True)
+        ops = [r.url.params["op"] for r in recorder.to("api.legiscan.com")]
+        assert ops == ["getSearch", "getBill"]  # since-filtered bill costs no getBill
+
+    def test_getbill_failure_keeps_record_and_reports_error(self, recorder, transport):
+        recorder.overrides["api.legiscan.com"] = lambda r: (
+            fixture("legiscan.json") if r.url.params["op"] == "getSearch"
+            else {"status": "ERROR"})
+        records, errors = run("legiscan", transport)
+        assert records[0].official_url == ""
+        assert "getBill status ERROR" in str(errors[0])
 
     def test_key_never_enters_trace(self, transport):
         records, _ = run("legiscan", transport)
