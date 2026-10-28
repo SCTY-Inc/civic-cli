@@ -17,6 +17,16 @@ def run(name, transport, topic="paid family caregiver", scope="all", since=None,
     return ADAPTERS[name].search(q, transport(), env)
 
 
+@pytest.mark.parametrize("name", ADAPTERS)
+def test_each_adapter_identifies_acquisition_client(name, recorder, transport):
+    run(name, transport)
+    assert recorder.requests
+    assert all(
+        request.headers["User-Agent"] == "OpenAI File Downloader, XaiImageApiFetch/1.0"
+        for request in recorder.requests
+    )
+
+
 class TestGovInfo:
     def test_searches_bill_text_with_all_terms_and_key_in_header(self, recorder, transport):
         run("govinfo", transport, topic="artificial intelligence", since="2025-01-01")

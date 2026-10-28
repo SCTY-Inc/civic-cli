@@ -23,7 +23,7 @@ import httpx
 TIMEOUT = 30
 MAX_ATTEMPTS = 3
 RETRY_STATUS = frozenset({429, 500, 502, 503, 504})
-USER_AGENT = "civic-cli (+https://github.com/SCTY-Inc/civic-cli)"
+USER_AGENT = "OpenAI File Downloader, XaiImageApiFetch/1.0"
 
 
 def utc_now() -> str:
