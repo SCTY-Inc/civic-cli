@@ -1,0 +1,31 @@
+:root { --paper: #f0f0f0; --ink: #000; --muted: rgba(0, 0, 0, 0.62); --rule: rgba(0, 0, 0, 0.12); --well: rgba(0, 0, 0, 0.05); }
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--paper); color: var(--ink); font: 18px/1.65 "Helvetica Neue", Helvetica, Arial, sans-serif; }
+main { max-width: 1040px; margin: 0 auto; padding: 0 24px; }
+a { color: inherit; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 4px; transition: opacity 150ms; }
+a:hover { opacity: 0.6; }
+a:active { opacity: 0.45; }
+a:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+nav { display: flex; align-items: center; justify-content: space-between; padding: 28px 0; font-size: 15px; }
+nav a { text-decoration: none; }
+.brand { display: flex; align-items: center; gap: 12px; font-size: 20px; font-weight: 500; letter-spacing: -0.02em; }
+.brand img { display: block; }
+.meta, figcaption, .small, footer { font-size: 14px; color: var(--muted); }
+.meta { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; margin: 0; }
+.hero { padding: 72px 0 56px; border-bottom: 1px solid var(--ink); }
+h1 { margin: 24px 0 0; max-width: 14ch; font-size: clamp(2.5rem, 7vw, 5rem); font-weight: 500; line-height: 0.95; letter-spacing: -0.05em; }
+.lede { margin: 28px 0 0; max-width: 40ch; font-size: clamp(1.1rem, 2.4vw, 1.375rem); line-height: 1.45; color: var(--muted); }
+.button { display: inline-block; margin-top: 36px; padding: 10px 22px; background: var(--ink); color: var(--paper); text-decoration: none; font-size: 15px; transition: opacity 150ms, transform 150ms; }
+.button:active { transform: scale(0.97); }
+section { padding: 56px 0 0; max-width: 65ch; }
+h2 { margin: 0; font-size: 22px; font-weight: 500; letter-spacing: -0.01em; }
+p { margin: 14px 0 0; }
+.question { font-size: 1.25rem; line-height: 1.45; }
+code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.85em; background: var(--well); padding: 0.1em 0.3em; }
+pre { margin: 16px 0 0; padding: 20px 24px; background: var(--well); font: 14px/1.7 ui-monospace, SFMono-Regular, Menlo, monospace; overflow-x: auto; }
+figure { margin: 24px 0 0; }
+figure pre + pre { margin-top: 2px; }
+figcaption { margin-top: 10px; }
+footer { display: flex; flex-wrap: wrap; align-items: center; gap: 20px; margin-top: 96px; padding: 24px 0 40px; border-top: 1px solid var(--rule); }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
