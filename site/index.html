@@ -4,17 +4,41 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'">
-<title>civic-cli · SCTY Lab</title>
-<meta name="description" content="One search across official and open policy sources. Every record says where it came from.">
+<title>civic-cli: one search across US policy sources · SCTY Lab</title>
+<meta name="description" content="civic-cli is an open-source CLI and Python library that searches US bills, rules, court opinions and state legislation, and records where each result came from.">
 <link rel="canonical" href="https://civic.scty.org/">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="SCTY Lab">
-<meta property="og:title" content="civic-cli">
-<meta property="og:description" content="One search across official and open policy sources. Every record says where it came from.">
+<meta property="og:title" content="civic-cli: one search across US policy sources">
+<meta property="og:description" content="civic-cli is an open-source CLI and Python library that searches US bills, rules, court opinions and state legislation, and records where each result came from.">
 <meta property="og:url" content="https://civic.scty.org/">
+<meta property="og:image" content="https://civic.scty.org/icon.svg">
+<meta property="og:image:alt" content="civic-cli icon">
 <meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="civic-cli: one search across US policy sources">
+<meta name="twitter:description" content="civic-cli is an open-source CLI and Python library that searches US bills, rules, court opinions and state legislation, and records where each result came from.">
+<meta name="twitter:image" content="https://civic.scty.org/icon.svg">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="alternate" type="text/plain" href="llms.txt" title="llms.txt">
 <link rel="stylesheet" href="style.css">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "civic-cli",
+  "alternateName": "civic",
+  "url": "https://civic.scty.org/",
+  "description": "civic-cli is an open-source CLI and Python library that searches US bills, rules, court opinions and state legislation, and records where each result came from.",
+  "applicationCategory": "DeveloperApplication",
+  "softwareRequirements": "Python 3.11 or later",
+  "license": "https://opensource.org/licenses/MIT",
+  "isAccessibleForFree": true,
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+  "image": "https://civic.scty.org/icon.svg",
+  "sameAs": ["https://github.com/SCTY-Inc/civic-cli"],
+  "publisher": { "@type": "Organization", "name": "SCTY", "url": "https://scty.org" }
+}
+</script>
 </head>
 <body>
 <main>
@@ -24,15 +48,15 @@
   </nav>
 
   <header class="hero">
-    <p class="meta">SCTY Lab</p>
+    <p class="meta"><a href="https://scty.org/lab">SCTY Lab</a></p>
     <h1>One search across policy sources.</h1>
-    <p class="lede">civic searches bills, rules, dockets, court opinions and state legislation in one call. Every record says where it came from: the source, the request, the HTTP status, the time and a content hash.</p>
+    <p class="lede">civic-cli is an open-source command-line tool and Python library that searches US bills, rules, dockets, court opinions and state legislation in one call. It is for people and agents who need to show where each result came from. Every record carries its source, the request, the HTTP status, the time and a content hash.</p>
     <a class="button" href="https://github.com/SCTY-Inc/civic-cli">View on GitHub</a>
   </header>
 
   <section aria-labelledby="file-title">
     <h2 id="file-title">The output is the record</h2>
-    <p>civic has no database, no cache and no state. Each run returns one envelope: a run line with every call it made and every error, then one line per record. Save it as JSON or JSONL and it is a complete account of that search. Add <code>--raw-dir</code> to keep each raw response as well.</p>
+    <p>civic keeps nothing between runs. Each run returns one envelope. In JSONL, the first line lists every call the run made and every error, and each line after it is one record. Saved to a file, that envelope is a complete account of the search. Add <code>--raw-dir</code> to keep each raw response as well.</p>
     <figure>
       <pre tabindex="0" aria-label="Example record">{
   "type": "record",
@@ -49,29 +73,29 @@
     "item_sha256": "sha256:a78ff93c…"
   }
 }</pre>
-      <figcaption>One record from the quickstart below, shortened. Keys never appear in the saved parameters.</figcaption>
+      <figcaption>One record from the quickstart below, shortened. API keys never appear in the saved parameters.</figcaption>
     </figure>
   </section>
 
   <section aria-labelledby="start-title">
     <h2 id="start-title">Quickstart</h2>
-    <p>Two dependencies, <code>httpx</code> and <code>python-dotenv</code>. No model calls.</p>
+    <p>civic needs Python 3.11 or later and has two dependencies, <code>httpx</code> and <code>python-dotenv</code>. It makes no model calls.</p>
     <pre tabindex="0" aria-label="Quickstart commands">uv tool install git+https://github.com/SCTY-Inc/civic-cli
 civic doctor
 civic search "respite care" --sources federal_register --format jsonl</pre>
-    <p class="small">The Federal Register needs no key. Most other sources need a free API key: GovInfo, Regulations.gov, Open States, LegiScan and Exa. Put them in your environment or in a <code>.env</code> file in the folder you run from. <code>civic doctor</code> shows which sources can run. In our test on 15 November 2026 without keys, only the Federal Register answered. CourtListener returned 401, Semantic Scholar returned 429, and Census did not return JSON.</p>
+    <p class="small">The Federal Register needs no key. GovInfo, Regulations.gov, Open States, LegiScan and Exa each need an API key, and Exa charges per request. Export the keys in your shell before you run civic. <code>civic doctor</code> shows which sources can run. In our test on 15 November 2026 without keys, only the Federal Register answered. CourtListener returned 401, Semantic Scholar returned 429, and Census did not return JSON.</p>
   </section>
 
   <section aria-labelledby="why-title">
     <h2 id="why-title">Why</h2>
     <p class="question">If an agent tells you a bill moved, can you check where it read that?</p>
-    <p>civic used to do more. It had a Gemini pipeline that researched, wrote and reviewed reports, with presets, a compare mode and a cache. In October 2026 all of that came out, and the code went from 2,744 lines to 1,176. What stayed is the part a caller cannot rebuild later: adapters for each source and a record that carries its own provenance.</p>
-    <p>A source that fails does not stop the search. Its error goes into <code>errors[]</code> next to the records from sources that answered. Our CourtListener test shows why this matters. <code>civic doctor</code> lists CourtListener as ready because it needs no key, but the service now refuses requests without a token. The run still finished and recorded the 401.</p>
+    <p>civic used to do more. It had a Gemini pipeline that researched, wrote and reviewed reports, with presets, a compare mode and a cache. In October 2026 all of that came out, and the code went from 2,744 lines to 1,176. What stayed is the part a caller cannot rebuild later: an adapter for each source and a record that carries its own provenance.</p>
+    <p>A source that fails does not stop the search. Its error goes into <code>errors[]</code> next to the records from sources that answered. In our test, <code>civic doctor</code> listed CourtListener as ready because it needs no key, but the service now refuses requests without a token. The run still finished and recorded the 401.</p>
   </section>
 
   <section aria-labelledby="delete-title">
     <h2 id="delete-title">If you delete it tomorrow, you lose nothing</h2>
-    <p>civic keeps nothing. The envelopes and raw responses you saved are ordinary JSON files, and each record links to its official source. The data stays under each provider's terms.</p>
+    <p>The envelopes and raw responses you saved are ordinary JSON files, and each record links to its official source. The data stays under each provider's terms.</p>
   </section>
 
   <footer>

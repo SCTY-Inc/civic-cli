@@ -1,0 +1,32 @@
+# civic-cli
+
+> civic-cli is an open-source command-line tool and Python library that searches US bills, rules, dockets, court opinions and state legislation in one call. Every record carries its provenance: adapter, endpoint, parameters, HTTP status, time, terms and a content hash. Made by SCTY Lab.
+
+- Source: https://github.com/SCTY-Inc/civic-cli (MIT license; source data stays under each provider's terms)
+- Requires Python 3.11 or later. Dependencies: httpx, python-dotenv. No model calls, no cache, no state.
+- Sources: GovInfo, Federal Register, Regulations.gov, CourtListener, Open States, LegiScan, Census, Semantic Scholar, Exa.
+- Keys: `GOVINFO_API_KEY`, `REGULATIONS_GOV_API_KEY`, `OPENSTATES_API_KEY`, `LEGISCAN_API_KEY`, `EXA_API_KEY`; `CENSUS_API_KEY` optional. The Federal Register needs none.
+- Scopes: `all` (default), `federal`, `policy`, `news`, `state:XX,YY`. `--sources a,b` overrides scope.
+- Output: one envelope (schema `civic.search.v1`). With `--format jsonl`, line 1 is the run header with `sources[]` (including every call) and `errors[]`; each later line is one record.
+- A failed source never stops the search; its failure goes to `errors[]`. Exit codes: 0 when at least one source answered, 1 when none did, 2 for usage errors.
+
+## Quickstart
+
+```sh
+uv tool install git+https://github.com/SCTY-Inc/civic-cli
+civic doctor
+civic search "respite care" --sources federal_register --format jsonl
+```
+
+## Python
+
+```python
+from civic import search
+envelope = search("paid family caregiver", scope="policy", since="2025-01-01")
+data = envelope.to_dict()
+```
+
+## More
+
+- Page: https://civic.scty.org/
+- SCTY Lab: https://scty.org/lab
